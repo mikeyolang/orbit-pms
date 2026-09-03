@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { useOrg } from "@/components/app/app-shell";
 import { NewProjectDialog } from "@/components/app/new-project-dialog";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,7 @@ function ProjectsIndex() {
   const [projects, setProjects] = useState<Project[] | null>(null);
 
   useEffect(() => {
-    supabase
+    postgres
       .from("projects")
       .select("*")
       .eq("organization_id", currentOrg.organization_id)

@@ -2,13 +2,17 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowRight, CheckCircle2, KanbanSquare, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { authClient } from "@/lib/auth-client";
 
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
       { title: "Helix — Project Management for Fast Teams" },
-      { name: "description", content: "Plan sprints, track tasks, and ship together. A modern PM tool inspired by Linear." },
+      {
+        name: "description",
+        content:
+          "Plan sprints, track tasks, and ship together. A modern PM tool inspired by Linear.",
+      },
     ],
   }),
   component: Landing,
@@ -20,11 +24,11 @@ function Landing() {
 
   useEffect(() => {
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
+    authClient.getSession().then(({ data }) => {
       if (!active) return;
-      if (data.session) {
+      if (data?.session) {
         setSignedIn(true);
-        navigate({ to: "/onboarding", replace: true });
+        navigate({ to: "/app", replace: true });
       }
     });
     return () => {
@@ -50,7 +54,9 @@ function Landing() {
             ) : (
               <>
                 <Link to="/auth">
-                  <Button variant="ghost" size="sm">Sign in</Button>
+                  <Button variant="ghost" size="sm">
+                    Sign in
+                  </Button>
                 </Link>
                 <Link to="/auth" search={{ mode: "signup" }}>
                   <Button size="sm">Get started</Button>
@@ -67,10 +73,12 @@ function Landing() {
             Phase 1 — Auth & Organizations
           </div>
           <h1 className="mx-auto max-w-3xl text-5xl font-semibold tracking-tight md:text-6xl">
-            Project management <span className="text-muted-foreground">that gets out of the way.</span>
+            Project management{" "}
+            <span className="text-muted-foreground">that gets out of the way.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base text-muted-foreground">
-            Plan sprints, track tasks across Kanban and flowcharts, and hold the team accountable — all in one calm, fast workspace.
+            Plan sprints, track tasks across Kanban and flowcharts, and hold the team accountable —
+            all in one calm, fast workspace.
           </p>
           <div className="mt-8 flex items-center justify-center gap-3">
             <Link to="/auth" search={{ mode: "signup" }}>
@@ -79,15 +87,29 @@ function Landing() {
               </Button>
             </Link>
             <Link to="/auth">
-              <Button size="lg" variant="ghost">Sign in</Button>
+              <Button size="lg" variant="ghost">
+                Sign in
+              </Button>
             </Link>
           </div>
         </section>
         <section className="grid gap-4 pb-24 md:grid-cols-3">
           {[
-            { icon: KanbanSquare, title: "Kanban + Scrum", body: "Drag-and-drop boards, sprints, burndown — coming next." },
-            { icon: Users, title: "Team & roles", body: "Owner, Admin, Manager, Member, Viewer — fine-grained." },
-            { icon: CheckCircle2, title: "Accountability", body: "Overdue alerts, missed-deadline log, daily digest." },
+            {
+              icon: KanbanSquare,
+              title: "Kanban + Scrum",
+              body: "Drag-and-drop boards, sprints, burndown — coming next.",
+            },
+            {
+              icon: Users,
+              title: "Team & roles",
+              body: "Owner, Admin, Manager, Member, Viewer — fine-grained.",
+            },
+            {
+              icon: CheckCircle2,
+              title: "Accountability",
+              body: "Overdue alerts, missed-deadline log, daily digest.",
+            },
           ].map((f) => (
             <div key={f.title} className="rounded-xl border border-border/60 bg-card/50 p-5">
               <f.icon className="h-5 w-5 text-primary" />

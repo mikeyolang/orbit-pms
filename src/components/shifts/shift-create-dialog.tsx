@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -48,7 +48,7 @@ export function ShiftCreateDialog({
   async function submit() {
     if (!userId || !typeId || !type) return toast.error("Choose member and shift type");
     setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u } = await postgres.auth.getUser();
     const startDate = new Date(start + "T00:00:00");
     const endDate = new Date(end + "T00:00:00");
     const rows: {
@@ -73,7 +73,7 @@ export function ShiftCreateDialog({
       }
     }
 
-    const { error } = await supabase.from("shifts").insert(rows);
+    const { error } = await postgres.from("shifts").insert(rows);
     setLoading(false);
     if (error) return toast.error(error.message);
     toast.success(`${rows.length} shift${rows.length > 1 ? "s" : ""} scheduled`);

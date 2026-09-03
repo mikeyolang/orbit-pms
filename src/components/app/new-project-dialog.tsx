@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { useOrg } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -35,9 +35,9 @@ export function NewProjectDialog({ trigger }: { trigger?: React.ReactNode }) {
     if (!parsed.success) return toast.error(parsed.error.issues[0].message);
 
     setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u } = await postgres.auth.getUser();
     if (!u.user) { setLoading(false); return; }
-    const { data, error } = await supabase
+    const { data, error } = await postgres
       .from("projects")
       .insert({
         organization_id: currentOrg.organization_id,

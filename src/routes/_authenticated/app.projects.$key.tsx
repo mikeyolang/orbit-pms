@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { useOrg } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -39,15 +39,15 @@ function ProjectDetail() {
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const { data: p } = await supabase
+    const { data: p } = await postgres
       .from("projects").select("*")
       .eq("organization_id", currentOrg.organization_id).eq("key", key).maybeSingle();
     if (!p) { setProject(null); return; }
     setProject(p);
     const [{ data: t }, { data: s }, { data: m }] = await Promise.all([
-      supabase.from("tasks").select("*").eq("project_id", p.id).order("number", { ascending: false }),
-      supabase.from("sprints").select("*").eq("project_id", p.id).order("start_date", { ascending: false, nullsFirst: false }),
-      supabase.from("milestones").select("*").eq("project_id", p.id).order("position"),
+      postgres.from("tasks").select("*").eq("project_id", p.id).order("number", { ascending: false }),
+      postgres.from("sprints").select("*").eq("project_id", p.id).order("start_date", { ascending: false, nullsFirst: false }),
+      postgres.from("milestones").select("*").eq("project_id", p.id).order("position"),
     ]);
     setTasks(t ?? []);
     setSprints(s ?? []);
@@ -59,7 +59,7 @@ function ProjectDetail() {
   // Realtime: refresh tasks for this project on any insert/update/delete
   useEffect(() => {
     if (!project?.id) return;
-    const channel = supabase
+    const channel = postgres
       .channel(`project-${project.id}-tasks`)
       .on(
         "postgres_changes",
@@ -67,7 +67,7 @@ function ProjectDetail() {
         () => load(),
       )
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { postgres.removeChannel(channel); };
   }, [project?.id, load]);
 
   if (project === undefined) return <div className="flex min-h-[60vh] items-center justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>;
@@ -151,7 +151,7 @@ function TaskTable({ tasks, projectKey, onOpen, onChanged }: {
   tasks: Task[]; projectKey: string; onOpen: (t: Task) => void; onChanged: () => void;
 }) {
   async function quickUpdate(id: string, patch: Partial<Task>) {
-    const { error } = await supabase.from("tasks").update(patch).eq("id", id);
+    const { error } = await postgres.from("tasks").update(patch).eq("id", id);
     if (error) toast.error(error.message);
     onChanged();
   }
@@ -237,7 +237,7 @@ function SprintsTab({ projectId, sprints, onChanged, tasks, projectKey }: {
                 </p>
               </div>
               <Select value={s.status} onValueChange={async (v) => {
-                await supabase.from("sprints").update({ status: v as never }).eq("id", s.id);
+                await postgres.from("sprints").update({ status: v as never }).eq("id", s.id);
                 onChanged();
               }}>
                 <SelectTrigger className="h-7 w-32"><SelectValue /></SelectTrigger>
@@ -276,9 +276,9 @@ function NewSprintDialog({ projectId, onCreated }: { projectId: string; onCreate
     e.preventDefault();
     if (name.trim().length < 2) return toast.error("Name is required");
     setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u } = await postgres.auth.getUser();
     if (!u.user) { setLoading(false); return; }
-    const { error } = await supabase.from("sprints").insert({
+    const { error } = await postgres.from("sprints").insert({
       project_id: projectId, name: name.trim(), goal: goal.trim() || null,
       start_date: start || null, end_date: end || null, created_by: u.user.id,
     });
@@ -334,7 +334,7 @@ function MilestonesTab({ projectId, milestones, onChanged, tasks, projectKey }: 
                 <p className="mt-1 text-[11px] text-muted-foreground">Due {m.due_date ? new Date(m.due_date).toLocaleDateString() : "TBD"} • {done}/{items.length} done</p>
               </div>
               <Select value={m.status} onValueChange={async (v) => {
-                await supabase.from("milestones").update({ status: v as never }).eq("id", m.id);
+                await postgres.from("milestones").update({ status: v as never }).eq("id", m.id);
                 onChanged();
               }}>
                 <SelectTrigger className="h-7 w-32"><SelectValue /></SelectTrigger>
@@ -375,9 +375,9 @@ function NewMilestoneDialog({ projectId, onCreated }: { projectId: string; onCre
     e.preventDefault();
     if (name.trim().length < 2) return toast.error("Name is required");
     setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u } = await postgres.auth.getUser();
     if (!u.user) { setLoading(false); return; }
-    const { error } = await supabase.from("milestones").insert({
+    const { error } = await postgres.from("milestones").insert({
       project_id: projectId, name: name.trim(), description: desc.trim() || null,
       due_date: due || null, created_by: u.user.id,
     });

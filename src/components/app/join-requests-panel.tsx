@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -30,7 +30,7 @@ export function JoinRequestsPanel({ orgId, onChanged }: { orgId: string; onChang
 
   const load = useCallback(async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data } = await postgres
       .from("join_requests")
       .select("id, user_id, email, full_name, message, created_at")
       .eq("organization_id", orgId)
@@ -46,7 +46,7 @@ export function JoinRequestsPanel({ orgId, onChanged }: { orgId: string; onChang
 
   async function decide(id: string, approve: boolean) {
     setWorking(id);
-    const { error } = await supabase.rpc("decide_join_request", {
+    const { error } = await postgres.rpc("decide_join_request", {
       _request_id: id,
       _approve: approve,
       _role: (roles[id] ?? "member") as OrgRole,

@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
@@ -37,7 +37,7 @@ export function SprintBoard({
 
   async function assignToSprint(taskId: string) {
     if (!sprint) return;
-    const { error } = await supabase.from("tasks").update({ sprint_id: sprint.id }).eq("id", taskId);
+    const { error } = await postgres.from("tasks").update({ sprint_id: sprint.id }).eq("id", taskId);
     if (error) return toast.error(error.message);
     onChanged();
   }

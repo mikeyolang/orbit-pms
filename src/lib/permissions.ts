@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import type { OrgRole } from "@/lib/auth";
 
 export type AppPermission =
@@ -14,6 +14,7 @@ export type AppPermission =
   | "shifts.read"
   | "shifts.write"
   | "shifts.approve"
+  | "shifts.delete"
   | "reports.view";
 
 export interface PermissionMeta {
@@ -36,6 +37,7 @@ export const PERMISSIONS: PermissionMeta[] = [
   { key: "shifts.read", label: "View shifts", description: "See the rota and their own shifts.", group: "Shifts" },
   { key: "shifts.write", label: "Schedule shifts", description: "Create, edit and drag shifts on the calendar.", group: "Shifts" },
   { key: "shifts.approve", label: "Approve swaps", description: "Approve or decline shift swap requests.", group: "Shifts" },
+  { key: "shifts.delete", label: "Delete shifts", description: "Permanently remove scheduled shifts.", group: "Shifts" },
 ];
 
 export const PERMISSION_GROUPS = ["Workspace", "People", "Projects", "Tasks", "Shifts"] as const;
@@ -64,7 +66,7 @@ export function useMyPermissions(orgId: string | null | undefined) {
       return;
     }
     setLoading(true);
-    const { data } = await supabase.rpc("my_permissions", { _org: orgId });
+    const { data } = await postgres.rpc("my_permissions", { _org: orgId });
     const next: PermissionMap = {};
     for (const row of (data ?? []) as { permission: AppPermission; allowed: boolean }[]) {
       next[row.permission] = row.allowed;

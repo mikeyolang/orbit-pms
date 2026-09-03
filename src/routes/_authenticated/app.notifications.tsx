@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { useAuthSession } from "@/lib/auth";
 import { useOrg } from "@/components/app/app-shell";
 import { Bell, Loader2, MessageSquare, Activity } from "lucide-react";
@@ -34,22 +34,24 @@ function InboxPage() {
   const { user } = useAuthSession();
   const { currentOrg } = useOrg();
   const [items, setItems] = useState<InboxItem[] | null>(null);
+  const [systemItems, setSystemItems] = useState<any[]>([]);
 
   const load = useCallback(async () => {
     if (!user) return;
     setItems(null);
 
-    const { data: projects } = await supabase
+    const [{ data: projects }, { data: notices }] = await Promise.all([postgres
       .from("projects")
       .select("id")
-      .eq("organization_id", currentOrg.organization_id);
+      .eq("organization_id", currentOrg.organization_id), postgres.from("system_notifications").select("*").eq("user_id", user.id).order("created_at", { ascending: false }).limit(50)]);
+    setSystemItems(notices ?? []);
     const projectIds = (projects ?? []).map((p) => p.id);
     if (projectIds.length === 0) {
       setItems([]);
       return;
     }
 
-    const { data: myTasks } = await supabase
+    const { data: myTasks } = await postgres
       .from("tasks")
       .select("id")
       .in("project_id", projectIds)
@@ -61,14 +63,14 @@ function InboxPage() {
     }
 
     const [act, com] = await Promise.all([
-      supabase
+      postgres
         .from("task_activity")
         .select("id, created_at, action, actor_id, task:tasks(id, number, title, project:projects(key, name, color))")
         .in("task_id", taskIds)
         .neq("actor_id", user.id)
         .order("created_at", { ascending: false })
         .limit(40),
-      supabase
+      postgres
         .from("task_comments")
         .select("id, created_at, body, author_id, task:tasks(id, number, title, project:projects(key, name, color))")
         .in("task_id", taskIds)
@@ -82,7 +84,7 @@ function InboxPage() {
     (com.data ?? []).forEach((c: any) => actorIds.add(c.author_id));
     let profileMap = new Map<string, { full_name: string | null; email: string | null }>();
     if (actorIds.size > 0) {
-      const { data: profs } = await supabase
+      const { data: profs } = await postgres
         .from("profiles")
         .select("id, full_name, email")
         .in("id", Array.from(actorIds));
@@ -128,6 +130,7 @@ function InboxPage() {
       </div>
 
       <div className="mt-6 overflow-hidden rounded-xl border border-border bg-card">
+        {systemItems.length > 0 && <ul className="divide-y divide-border border-b border-border">{systemItems.map((notice) => <li key={notice.id} className="flex gap-3 bg-warning/5 px-4 py-3"><Bell className="mt-0.5 h-4 w-4 text-warning" /><div className="min-w-0 flex-1"><div className="text-sm font-medium">{notice.title}</div><div className="text-xs text-muted-foreground">{notice.body}</div>{notice.href && <Link to={notice.href as any} className="mt-1 inline-block text-xs text-primary hover:underline">Review</Link>}</div></li>)}</ul>}
         {items === null ? (
           <div className="flex justify-center py-16">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

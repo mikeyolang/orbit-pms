@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -20,7 +20,7 @@ export function EndShiftDialog({
 
   async function submit() {
     setLoading(true);
-    const { error } = await supabase
+    const { error } = await postgres
       .from("shifts")
       .update({ status: "ended", ended_at: new Date().toISOString(), end_comment: comment || null })
       .eq("id", shiftId);

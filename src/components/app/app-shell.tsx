@@ -15,8 +15,14 @@ import {
 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
-import { supabase } from "@/integrations/supabase/client";
-import { useAuthSession, useMemberships, getCurrentOrgId, setCurrentOrgId, type OrgMembership } from "@/lib/auth";
+import { authClient } from "@/lib/auth-client";
+import {
+  useAuthSession,
+  useMemberships,
+  getCurrentOrgId,
+  setCurrentOrgId,
+  type OrgMembership,
+} from "@/lib/auth";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -46,16 +52,12 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const refreshSupport = useCallback(async () => {
     if (!user || !currentOrg) return;
-    const { data } = await supabase
-      .from("organization_members")
-      .select("is_support_only")
-      .eq("organization_id", currentOrg.organization_id)
-      .eq("user_id", user.id)
-      .maybeSingle();
-    setIsSupportOnly(!!data?.is_support_only);
+    setIsSupportOnly(!!currentOrg.is_support_only);
   }, [user, currentOrg]);
 
-  useEffect(() => { refreshSupport(); }, [refreshSupport]);
+  useEffect(() => {
+    refreshSupport();
+  }, [refreshSupport]);
 
   useEffect(() => {
     if (!sessionLoading && !memLoading && memberships.length === 0) {
@@ -84,7 +86,9 @@ export function AppShell({ children }: { children: ReactNode }) {
     ...(canManage ? [{ to: "/app/team", label: "People & Roles", icon: Users, exact: false }] : []),
     { to: "/app/settings", label: "Settings", icon: Settings, exact: false },
   ];
-  const supportNav = fullNav.filter((n) => ["/app", "/app/shifts", "/app/tasks", "/app/settings"].includes(n.to));
+  const supportNav = fullNav.filter((n) =>
+    ["/app", "/app/shifts", "/app/tasks", "/app/settings"].includes(n.to),
+  );
   const nav = isSupportOnly ? supportNav : fullNav;
 
   // Route guard for support-only users
@@ -93,9 +97,8 @@ export function AppShell({ children }: { children: ReactNode }) {
     navigate({ to: "/app/shifts", replace: true });
   }
 
-
   async function signOut() {
-    await supabase.auth.signOut();
+    await authClient.signOut();
     navigate({ to: "/auth" });
   }
 
@@ -134,7 +137,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
-              <DropdownMenuItem onClick={() => navigate({ to: "/onboarding", search: { mode: "additional" } })}>
+              <DropdownMenuItem
+                onClick={() => navigate({ to: "/onboarding", search: { mode: "additional" } })}
+              >
                 <Plus className="h-4 w-4" />
                 Create workspace
               </DropdownMenuItem>
@@ -164,7 +169,9 @@ export function AppShell({ children }: { children: ReactNode }) {
 
         <div className="border-t border-sidebar-border p-2">
           <div className="mb-1 flex items-center justify-between px-1">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">Preferences</span>
+            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+              Preferences
+            </span>
             <ThemeToggle />
           </div>
           <DropdownMenu>
@@ -174,7 +181,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                   {user?.email?.[0]?.toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm">{user?.user_metadata?.full_name ?? user?.email}</div>
+                  <div className="truncate text-sm">
+                    {user?.user_metadata?.full_name ?? user?.email}
+                  </div>
                   <div className="truncate text-xs text-muted-foreground">{user?.email}</div>
                 </div>
               </button>
@@ -190,7 +199,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <main className="flex-1 overflow-y-auto">
-        <OrgContext.Provider value={{ currentOrg, role, refresh, isSupportOnly, refreshSupport }}>{children}</OrgContext.Provider>
+        <OrgContext.Provider value={{ currentOrg, role, refresh, isSupportOnly, refreshSupport }}>
+          {children}
+        </OrgContext.Provider>
       </main>
     </div>
   );
@@ -205,8 +216,6 @@ export const OrgContext = createContext<{
   isSupportOnly: boolean;
   refreshSupport: () => Promise<void>;
 } | null>(null);
-
-
 
 export function useOrg() {
   const ctx = useContext(OrgContext);

@@ -1,0 +1,31 @@
+name: orbit-pms
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: orbit
+      POSTGRES_USER: orbit
+      POSTGRES_PASSWORD: orbit_local_password
+    ports:
+      # Use 5433 on the Mac so an existing PostgreSQL service can keep 5432.
+      - "127.0.0.1:5433:5432"
+    volumes:
+      - orbit_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orbit -d orbit"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  mailpit:
+    image: axllent/mailpit:v1.27
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:1025:1025"
+      # Expose only the Mailpit web inbox to trusted devices on the local network.
+      - "8025:8025"
+
+volumes:
+  orbit_postgres_data:

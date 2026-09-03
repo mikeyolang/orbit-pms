@@ -12,7 +12,6 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
-import { supabase } from "@/integrations/supabase/client";
 import { ThemeProvider, useTheme } from "@/components/theme-provider";
 
 const THEME_INIT_SCRIPT = `(function(){try{var t=localStorage.getItem('theme');var d=t==='dark'||((t==='system'||!t)&&window.matchMedia('(prefers-color-scheme: dark)').matches);var r=document.documentElement;if(d){r.classList.add('dark');r.style.colorScheme='dark';}else{r.style.colorScheme='light';}}catch(e){}})();`;
@@ -52,9 +51,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
         <h1 className="text-xl font-semibold tracking-tight text-foreground">
           This page didn't load
         </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Something went wrong on our end.
-        </p>
+        <p className="mt-2 text-sm text-muted-foreground">Something went wrong on our end.</p>
         <div className="mt-6 flex flex-wrap justify-center gap-2">
           <button
             onClick={() => {
@@ -83,13 +80,33 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "Helix — Project Management for Fast Teams" },
-      { name: "description", content: "Plan sprints, track tasks, and ship together. A modern PM tool inspired by Linear." },
+      {
+        name: "description",
+        content:
+          "Plan sprints, track tasks, and ship together. A modern PM tool inspired by Linear.",
+      },
       { property: "og:title", content: "Helix — Project Management for Fast Teams" },
       { name: "twitter:title", content: "Helix — Project Management for Fast Teams" },
-      { property: "og:description", content: "Plan sprints, track tasks, and ship together. A modern PM tool inspired by Linear." },
-      { name: "twitter:description", content: "Plan sprints, track tasks, and ship together. A modern PM tool inspired by Linear." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/eb95e977-fa7b-41d9-a5b0-f15512af63d3" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/eb95e977-fa7b-41d9-a5b0-f15512af63d3" },
+      {
+        property: "og:description",
+        content:
+          "Plan sprints, track tasks, and ship together. A modern PM tool inspired by Linear.",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "Plan sprints, track tasks, and ship together. A modern PM tool inspired by Linear.",
+      },
+      {
+        property: "og:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/eb95e977-fa7b-41d9-a5b0-f15512af63d3",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/eb95e977-fa7b-41d9-a5b0-f15512af63d3",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -131,17 +148,6 @@ function ThemedToaster() {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const router = useRouter();
-
-  useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((event) => {
-      if (event === "SIGNED_IN" || event === "SIGNED_OUT" || event === "USER_UPDATED") {
-        router.invalidate();
-        if (event !== "SIGNED_OUT") queryClient.invalidateQueries();
-      }
-    });
-    return () => sub.subscription.unsubscribe();
-  }, [router, queryClient]);
 
   return (
     <ThemeProvider>

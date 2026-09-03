@@ -1,4 +1,4 @@
-import type { Database } from "@/integrations/supabase/types";
+import type { Database } from "@/lib/database-types";
 
 export type Shift = Database["public"]["Tables"]["shifts"]["Row"];
 export type ShiftType = Database["public"]["Tables"]["shift_types"]["Row"];

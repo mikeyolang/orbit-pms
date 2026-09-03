@@ -1,11 +1,10 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import {
   Dialog,
   DialogContent,
@@ -28,7 +27,6 @@ import {
   ArrowRight,
   Building2,
   Clock3,
-  KeyRound,
   Loader2,
   LogOut,
   Mail,
@@ -49,7 +47,7 @@ interface PendingInvite {
   organization_id: string;
   organization_name: string;
   role: string;
-  code: string;
+  token: string;
   expires_at: string;
 }
 
@@ -76,18 +74,17 @@ function WorkspaceHome() {
   const [profile, setProfile] = useState<{ id: string; full_name: string | null; email: string | null } | null>(null);
 
   const [createOpen, setCreateOpen] = useState(mode === "additional");
-  const [joinOpen, setJoinOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
 
   const load = useCallback(async () => {
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u } = await postgres.auth.getUser();
     const [m, inv, jr, prof] = await Promise.all([
-      supabase
+      postgres
         .from("organization_members")
         .select("organization_id, role, organization:organizations(id, name, slug, invite_code)"),
-      supabase.rpc("my_pending_invites"),
-      supabase.rpc("my_join_requests"),
-      u.user ? supabase.from("profiles").select("id, full_name, email").eq("id", u.user.id).maybeSingle() : null,
+      postgres.rpc("my_pending_invites"),
+      postgres.rpc("my_join_requests"),
+      u.user ? postgres.from("profiles").select("id, full_name, email").eq("id", u.user.id).maybeSingle() : null,
     ]);
     const rawMemberships = (m.data ?? []) as unknown as OrgMembership[];
     const rank: Record<string, number> = { owner: 5, admin: 4, manager: 3, member: 2, viewer: 1 };
@@ -119,7 +116,7 @@ function WorkspaceHome() {
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    await postgres.auth.signOut();
     navigate({ to: "/auth" });
   }
 
@@ -219,9 +216,6 @@ function WorkspaceHome() {
             <h2 className="text-sm font-medium">Workspaces dashboard</h2>
             {memberships.length > 0 && (
               <div className="flex gap-2">
-                <Button variant="outline" size="sm" className="gap-1.5" onClick={() => setJoinOpen(true)}>
-                  <KeyRound className="h-3.5 w-3.5" /> Join with code
-                </Button>
                 <Button size="sm" className="gap-1.5" onClick={() => setCreateOpen(true)}>
                   <Plus className="h-3.5 w-3.5" /> New workspace
                 </Button>
@@ -254,14 +248,11 @@ function WorkspaceHome() {
               <Building2 className="mx-auto h-6 w-6 text-muted-foreground" />
               <h3 className="mt-3 text-sm font-medium">No workspaces yet</h3>
               <p className="mx-auto mt-1 max-w-sm text-sm text-muted-foreground">
-                Create your own workspace, or join an existing team with a code.
+                Create your own workspace, or ask a workspace administrator to invite you by email.
               </p>
               <div className="mt-5 flex flex-wrap items-center justify-center gap-2">
                 <Button className="gap-1.5" onClick={() => setCreateOpen(true)}>
                   <Plus className="h-4 w-4" /> Create my workspace
-                </Button>
-                <Button variant="outline" className="gap-1.5" onClick={() => setJoinOpen(true)}>
-                  <KeyRound className="h-4 w-4" /> Join with code
                 </Button>
               </div>
             </div>
@@ -277,7 +268,6 @@ function WorkspaceHome() {
           navigate({ to: "/app", replace: true });
         }}
       />
-      <JoinWithCodeDialog open={joinOpen} onOpenChange={setJoinOpen} onDone={load} />
       {profile && (
         <EditProfileDialog open={profileOpen} onOpenChange={setProfileOpen} profile={profile} onSaved={load} />
       )}
@@ -318,18 +308,8 @@ function InviteRow({ invite, onDone }: { invite: PendingInvite; onDone: () => Pr
 
   async function accept() {
     setWorking(true);
-    const { data, error } = await supabase.rpc("request_or_join_by_code", { p_code: invite.code });
+    navigate({ to: "/accept-invite/$token", params: { token: invite.token } });
     setWorking(false);
-    if (error) return toast.error(error.message.replace(/^.*?:\s*/, ""));
-    const result = data as unknown as { status: string; organization_id: string };
-    if (result?.status === "joined") {
-      setCurrentOrgId(result.organization_id);
-      toast.success(`Joined ${invite.organization_name}`);
-      navigate({ to: "/app", replace: true });
-      return;
-    }
-    toast.message("Request sent to the workspace admin");
-    await onDone();
   }
 
   return (
@@ -371,12 +351,12 @@ function CreateWorkspaceDialog({
     if (!parsed.success) return toast.error(parsed.error.issues[0].message);
 
     setLoading(true);
-    const { data: user } = await supabase.auth.getUser();
+    const { data: user } = await postgres.auth.getUser();
     if (!user.user) {
       setLoading(false);
       return toast.error("You are signed out. Please sign in again.");
     }
-    const { data, error } = await supabase
+    const { data, error } = await postgres
       .from("organizations")
       .insert({ name: parsed.data.name, slug: parsed.data.slug, created_by: user.user.id })
       .select("id")
@@ -429,85 +409,6 @@ function CreateWorkspaceDialog({
   );
 }
 
-function JoinWithCodeDialog({
-  open,
-  onOpenChange,
-  onDone,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  onDone: () => Promise<void>;
-}) {
-  const navigate = useNavigate();
-  const [code, setCode] = useState("");
-  const [message, setMessage] = useState("");
-  const [working, setWorking] = useState(false);
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const value = code.trim().toUpperCase();
-    if (value.length < 6) return toast.error("Enter the 8-character code");
-    setWorking(true);
-    const { data, error } = await supabase.rpc("request_or_join_by_code", {
-      p_code: value,
-      p_message: message.trim() || undefined,
-    });
-    setWorking(false);
-    if (error) return toast.error(error.message.replace(/^.*?:\s*/, ""));
-    const result = data as unknown as { status: string; organization_id: string; organization_name?: string };
-    if (result?.status === "joined") {
-      setCurrentOrgId(result.organization_id);
-      toast.success("Workspace joined");
-      navigate({ to: "/app", replace: true });
-      return;
-    }
-    onOpenChange(false);
-    toast.success(`Join request sent to ${result?.organization_name ?? "the workspace"} admin`);
-    await onDone();
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Join a workspace</DialogTitle>
-          <DialogDescription>
-            If your email was invited you'll join instantly. Otherwise we'll send a join request to the workspace admin.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={submit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Invite code</Label>
-            <Input
-              value={code}
-              onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="ABCD2345"
-              maxLength={8}
-              autoFocus
-              className="font-mono tracking-widest"
-            />
-          </div>
-          <div className="space-y-1.5">
-            <Label className="text-xs text-muted-foreground">Note to the admin (optional)</Label>
-            <Textarea
-              value={message}
-              onChange={(e) => setMessage(e.target.value)}
-              rows={2}
-              placeholder="Hi — I'm joining the support team."
-            />
-          </div>
-          <DialogFooter>
-            <Button type="submit" disabled={working} className="w-full">
-              {working && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Continue
-            </Button>
-          </DialogFooter>
-        </form>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 function EditProfileDialog({
   open,
   onOpenChange,
@@ -531,8 +432,8 @@ function EditProfileDialog({
     const parsed = z.string().trim().min(1, "Name is required").max(80).safeParse(fullName);
     if (!parsed.success) return toast.error(parsed.error.issues[0].message);
     setSaving(true);
-    const { error } = await supabase.from("profiles").update({ full_name: parsed.data }).eq("id", profile.id);
-    if (!error) await supabase.auth.updateUser({ data: { full_name: parsed.data } });
+    const { error } = await postgres.from("profiles").update({ full_name: parsed.data }).eq("id", profile.id);
+    if (!error) await postgres.auth.updateUser({ data: { full_name: parsed.data } });
     setSaving(false);
     if (error) return toast.error(error.message);
     toast.success("Profile updated");

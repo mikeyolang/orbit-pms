@@ -15,10 +15,19 @@ import { Route as ForgotPasswordRouteImport } from './routes/forgot-password'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ShiftRequestTokenRouteImport } from './routes/shift-request.$token'
+import { Route as ApiHealthRouteImport } from './routes/api.health'
+import { Route as ApiDataRouteImport } from './routes/api.data'
 import { Route as AcceptInviteTokenRouteImport } from './routes/accept-invite.$token'
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
+import { Route as ApiShiftRequestTokenRouteImport } from './routes/api.shift-request.$token'
+import { Route as ApiNotificationsProcessRouteImport } from './routes/api.notifications.process'
+import { Route as ApiMailgunWebhookRouteImport } from './routes/api.mailgun.webhook'
+import { Route as ApiMailProcessRouteImport } from './routes/api.mail.process'
+import { Route as ApiInvitationTokenRouteImport } from './routes/api.invitation.$token'
+import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AuthenticatedAppTeamRouteImport } from './routes/_authenticated/app.team'
 import { Route as AuthenticatedAppTasksRouteImport } from './routes/_authenticated/app.tasks'
 import { Route as AuthenticatedAppShiftsRouteImport } from './routes/_authenticated/app.shifts'
@@ -57,6 +66,21 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ShiftRequestTokenRoute = ShiftRequestTokenRouteImport.update({
+  id: '/shift-request/$token',
+  path: '/shift-request/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiHealthRoute = ApiHealthRouteImport.update({
+  id: '/api/health',
+  path: '/api/health',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiDataRoute = ApiDataRouteImport.update({
+  id: '/api/data',
+  path: '/api/data',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AcceptInviteTokenRoute = AcceptInviteTokenRouteImport.update({
   id: '/accept-invite/$token',
   path: '/accept-invite/$token',
@@ -76,6 +100,36 @@ const AuthenticatedAppIndexRoute = AuthenticatedAppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const ApiShiftRequestTokenRoute = ApiShiftRequestTokenRouteImport.update({
+  id: '/api/shift-request/$token',
+  path: '/api/shift-request/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiNotificationsProcessRoute = ApiNotificationsProcessRouteImport.update({
+  id: '/api/notifications/process',
+  path: '/api/notifications/process',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMailgunWebhookRoute = ApiMailgunWebhookRouteImport.update({
+  id: '/api/mailgun/webhook',
+  path: '/api/mailgun/webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiMailProcessRoute = ApiMailProcessRouteImport.update({
+  id: '/api/mail/process',
+  path: '/api/mail/process',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiInvitationTokenRoute = ApiInvitationTokenRouteImport.update({
+  id: '/api/invitation/$token',
+  path: '/api/invitation/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAuthSplatRoute = ApiAuthSplatRouteImport.update({
+  id: '/api/auth/$',
+  path: '/api/auth/$',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedAppTeamRoute = AuthenticatedAppTeamRouteImport.update({
   id: '/team',
@@ -132,11 +186,20 @@ export interface FileRoutesByFullPath {
   '/app': typeof AuthenticatedAppRouteWithChildren
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
+  '/api/data': typeof ApiDataRoute
+  '/api/health': typeof ApiHealthRoute
+  '/shift-request/$token': typeof ShiftRequestTokenRoute
   '/app/notifications': typeof AuthenticatedAppNotificationsRoute
   '/app/settings': typeof AuthenticatedAppSettingsRoute
   '/app/shifts': typeof AuthenticatedAppShiftsRoute
   '/app/tasks': typeof AuthenticatedAppTasksRoute
   '/app/team': typeof AuthenticatedAppTeamRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/invitation/$token': typeof ApiInvitationTokenRoute
+  '/api/mail/process': typeof ApiMailProcessRoute
+  '/api/mailgun/webhook': typeof ApiMailgunWebhookRoute
+  '/api/notifications/process': typeof ApiNotificationsProcessRoute
+  '/api/shift-request/$token': typeof ApiShiftRequestTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
   '/app/projects/$key': typeof AuthenticatedAppProjectsKeyRoute
   '/app/projects/': typeof AuthenticatedAppProjectsIndexRoute
@@ -150,11 +213,20 @@ export interface FileRoutesByTo {
   '/verify-email': typeof VerifyEmailRoute
   '/onboarding': typeof AuthenticatedOnboardingRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
+  '/api/data': typeof ApiDataRoute
+  '/api/health': typeof ApiHealthRoute
+  '/shift-request/$token': typeof ShiftRequestTokenRoute
   '/app/notifications': typeof AuthenticatedAppNotificationsRoute
   '/app/settings': typeof AuthenticatedAppSettingsRoute
   '/app/shifts': typeof AuthenticatedAppShiftsRoute
   '/app/tasks': typeof AuthenticatedAppTasksRoute
   '/app/team': typeof AuthenticatedAppTeamRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/invitation/$token': typeof ApiInvitationTokenRoute
+  '/api/mail/process': typeof ApiMailProcessRoute
+  '/api/mailgun/webhook': typeof ApiMailgunWebhookRoute
+  '/api/notifications/process': typeof ApiNotificationsProcessRoute
+  '/api/shift-request/$token': typeof ApiShiftRequestTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
   '/app/projects/$key': typeof AuthenticatedAppProjectsKeyRoute
   '/app/projects': typeof AuthenticatedAppProjectsIndexRoute
@@ -171,11 +243,20 @@ export interface FileRoutesById {
   '/_authenticated/app': typeof AuthenticatedAppRouteWithChildren
   '/_authenticated/onboarding': typeof AuthenticatedOnboardingRoute
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
+  '/api/data': typeof ApiDataRoute
+  '/api/health': typeof ApiHealthRoute
+  '/shift-request/$token': typeof ShiftRequestTokenRoute
   '/_authenticated/app/notifications': typeof AuthenticatedAppNotificationsRoute
   '/_authenticated/app/settings': typeof AuthenticatedAppSettingsRoute
   '/_authenticated/app/shifts': typeof AuthenticatedAppShiftsRoute
   '/_authenticated/app/tasks': typeof AuthenticatedAppTasksRoute
   '/_authenticated/app/team': typeof AuthenticatedAppTeamRoute
+  '/api/auth/$': typeof ApiAuthSplatRoute
+  '/api/invitation/$token': typeof ApiInvitationTokenRoute
+  '/api/mail/process': typeof ApiMailProcessRoute
+  '/api/mailgun/webhook': typeof ApiMailgunWebhookRoute
+  '/api/notifications/process': typeof ApiNotificationsProcessRoute
+  '/api/shift-request/$token': typeof ApiShiftRequestTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
   '/_authenticated/app/projects/$key': typeof AuthenticatedAppProjectsKeyRoute
   '/_authenticated/app/projects/': typeof AuthenticatedAppProjectsIndexRoute
@@ -192,11 +273,20 @@ export interface FileRouteTypes {
     | '/app'
     | '/onboarding'
     | '/accept-invite/$token'
+    | '/api/data'
+    | '/api/health'
+    | '/shift-request/$token'
     | '/app/notifications'
     | '/app/settings'
     | '/app/shifts'
     | '/app/tasks'
     | '/app/team'
+    | '/api/auth/$'
+    | '/api/invitation/$token'
+    | '/api/mail/process'
+    | '/api/mailgun/webhook'
+    | '/api/notifications/process'
+    | '/api/shift-request/$token'
     | '/app/'
     | '/app/projects/$key'
     | '/app/projects/'
@@ -210,11 +300,20 @@ export interface FileRouteTypes {
     | '/verify-email'
     | '/onboarding'
     | '/accept-invite/$token'
+    | '/api/data'
+    | '/api/health'
+    | '/shift-request/$token'
     | '/app/notifications'
     | '/app/settings'
     | '/app/shifts'
     | '/app/tasks'
     | '/app/team'
+    | '/api/auth/$'
+    | '/api/invitation/$token'
+    | '/api/mail/process'
+    | '/api/mailgun/webhook'
+    | '/api/notifications/process'
+    | '/api/shift-request/$token'
     | '/app'
     | '/app/projects/$key'
     | '/app/projects'
@@ -230,11 +329,20 @@ export interface FileRouteTypes {
     | '/_authenticated/app'
     | '/_authenticated/onboarding'
     | '/accept-invite/$token'
+    | '/api/data'
+    | '/api/health'
+    | '/shift-request/$token'
     | '/_authenticated/app/notifications'
     | '/_authenticated/app/settings'
     | '/_authenticated/app/shifts'
     | '/_authenticated/app/tasks'
     | '/_authenticated/app/team'
+    | '/api/auth/$'
+    | '/api/invitation/$token'
+    | '/api/mail/process'
+    | '/api/mailgun/webhook'
+    | '/api/notifications/process'
+    | '/api/shift-request/$token'
     | '/_authenticated/app/'
     | '/_authenticated/app/projects/$key'
     | '/_authenticated/app/projects/'
@@ -249,6 +357,15 @@ export interface RootRouteChildren {
   ResetPasswordRoute: typeof ResetPasswordRoute
   VerifyEmailRoute: typeof VerifyEmailRoute
   AcceptInviteTokenRoute: typeof AcceptInviteTokenRoute
+  ApiDataRoute: typeof ApiDataRoute
+  ApiHealthRoute: typeof ApiHealthRoute
+  ShiftRequestTokenRoute: typeof ShiftRequestTokenRoute
+  ApiAuthSplatRoute: typeof ApiAuthSplatRoute
+  ApiInvitationTokenRoute: typeof ApiInvitationTokenRoute
+  ApiMailProcessRoute: typeof ApiMailProcessRoute
+  ApiMailgunWebhookRoute: typeof ApiMailgunWebhookRoute
+  ApiNotificationsProcessRoute: typeof ApiNotificationsProcessRoute
+  ApiShiftRequestTokenRoute: typeof ApiShiftRequestTokenRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -295,6 +412,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/shift-request/$token': {
+      id: '/shift-request/$token'
+      path: '/shift-request/$token'
+      fullPath: '/shift-request/$token'
+      preLoaderRoute: typeof ShiftRequestTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/health': {
+      id: '/api/health'
+      path: '/api/health'
+      fullPath: '/api/health'
+      preLoaderRoute: typeof ApiHealthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/data': {
+      id: '/api/data'
+      path: '/api/data'
+      fullPath: '/api/data'
+      preLoaderRoute: typeof ApiDataRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/accept-invite/$token': {
       id: '/accept-invite/$token'
       path: '/accept-invite/$token'
@@ -322,6 +460,48 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/'
       preLoaderRoute: typeof AuthenticatedAppIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/api/shift-request/$token': {
+      id: '/api/shift-request/$token'
+      path: '/api/shift-request/$token'
+      fullPath: '/api/shift-request/$token'
+      preLoaderRoute: typeof ApiShiftRequestTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/notifications/process': {
+      id: '/api/notifications/process'
+      path: '/api/notifications/process'
+      fullPath: '/api/notifications/process'
+      preLoaderRoute: typeof ApiNotificationsProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mailgun/webhook': {
+      id: '/api/mailgun/webhook'
+      path: '/api/mailgun/webhook'
+      fullPath: '/api/mailgun/webhook'
+      preLoaderRoute: typeof ApiMailgunWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/mail/process': {
+      id: '/api/mail/process'
+      path: '/api/mail/process'
+      fullPath: '/api/mail/process'
+      preLoaderRoute: typeof ApiMailProcessRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/invitation/$token': {
+      id: '/api/invitation/$token'
+      path: '/api/invitation/$token'
+      fullPath: '/api/invitation/$token'
+      preLoaderRoute: typeof ApiInvitationTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/auth/$': {
+      id: '/api/auth/$'
+      path: '/api/auth/$'
+      fullPath: '/api/auth/$'
+      preLoaderRoute: typeof ApiAuthSplatRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/_authenticated/app/team': {
       id: '/_authenticated/app/team'
@@ -430,6 +610,15 @@ const rootRouteChildren: RootRouteChildren = {
   ResetPasswordRoute: ResetPasswordRoute,
   VerifyEmailRoute: VerifyEmailRoute,
   AcceptInviteTokenRoute: AcceptInviteTokenRoute,
+  ApiDataRoute: ApiDataRoute,
+  ApiHealthRoute: ApiHealthRoute,
+  ShiftRequestTokenRoute: ShiftRequestTokenRoute,
+  ApiAuthSplatRoute: ApiAuthSplatRoute,
+  ApiInvitationTokenRoute: ApiInvitationTokenRoute,
+  ApiMailProcessRoute: ApiMailProcessRoute,
+  ApiMailgunWebhookRoute: ApiMailgunWebhookRoute,
+  ApiNotificationsProcessRoute: ApiNotificationsProcessRoute,
+  ApiShiftRequestTokenRoute: ApiShiftRequestTokenRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

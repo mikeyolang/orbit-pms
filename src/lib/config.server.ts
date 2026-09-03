@@ -19,8 +19,28 @@ import process from "node:process";
 export function getServerConfig() {
   return {
     nodeEnv: process.env.NODE_ENV,
-    // Add server-only values here, e.g.:
-    //   databaseUrl: process.env.DATABASE_URL,
-    //   stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+    databaseUrl: process.env.DATABASE_URL,
+    authSecret: process.env.BETTER_AUTH_SECRET,
+    appUrl: process.env.APP_URL ?? "http://localhost:3000",
+    trustedOrigins: process.env.TRUSTED_ORIGINS,
+    mailgunApiKey: process.env.MAILGUN_API_KEY,
+    mailgunDomain: process.env.MAILGUN_DOMAIN,
+    mailgunBaseUrl: process.env.MAILGUN_BASE_URL ?? "https://api.mailgun.net",
+    mailFrom: process.env.MAIL_FROM,
+    mailgunWebhookSigningKey: process.env.MAILGUN_WEBHOOK_SIGNING_KEY,
+    mailMode: process.env.MAIL_MODE ?? "log",
+    mailSmtpHost: process.env.MAIL_SMTP_HOST ?? "127.0.0.1",
+    mailSmtpPort: Number(process.env.MAIL_SMTP_PORT ?? "1025"),
+    cronSecret: process.env.CRON_SECRET,
+    hrWebhookSecret: process.env.HR_WEBHOOK_SECRET,
   };
+}
+
+export function requireServerConfig<K extends keyof ReturnType<typeof getServerConfig>>(
+  ...keys: K[]
+): Required<Pick<ReturnType<typeof getServerConfig>, K>> & ReturnType<typeof getServerConfig> {
+  const config = getServerConfig();
+  const missing = keys.filter((key) => !config[key]);
+  if (missing.length) throw new Error(`Missing server configuration: ${missing.join(", ")}`);
+  return config as Required<Pick<typeof config, K>> & typeof config;
 }

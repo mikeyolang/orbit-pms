@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -32,8 +32,8 @@ function AuthPage() {
   // Already signed in? Keep the session and go straight into the app.
   useEffect(() => {
     let active = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (active && data.session && !invite) navigate({ to: "/onboarding", replace: true });
+    authClient.getSession().then(({ data }) => {
+      if (active && data?.session && !invite) navigate({ to: "/app", replace: true });
     });
     return () => {
       active = false;
@@ -42,62 +42,48 @@ function AuthPage() {
 
   async function handleSignup(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = z.object({
-      fullName: z.string().trim().min(1, "Name is required").max(80),
-      email: z.string().trim().email("Invalid email").max(255),
-      password: z.string().min(8, "Password must be at least 8 characters").max(72),
-    }).safeParse({ fullName, email, password });
+    const parsed = z
+      .object({
+        fullName: z.string().trim().min(1, "Name is required").max(80),
+        email: z.string().trim().email("Invalid email").max(255),
+        password: z.string().min(8, "Password must be at least 8 characters").max(72),
+      })
+      .safeParse({ fullName, email, password });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message);
       return;
     }
     setLoading(true);
-    const { data: signUpData, error } = await supabase.auth.signUp({
+    const { error } = await authClient.signUp.email({
+      name: parsed.data.fullName,
       email: parsed.data.email,
       password: parsed.data.password,
-      options: {
-        data: { full_name: parsed.data.fullName },
-        emailRedirectTo: window.location.origin,
-      },
+      callbackURL: invite ? `/accept-invite/${invite}?accept=1` : "/app",
     });
     if (error) {
       setLoading(false);
       toast.error(error.message);
       return;
     }
-    // Auto-confirm is enabled — ensure we have a session, then continue.
-    if (!signUpData.session) {
-      const { error: signInError } = await supabase.auth.signInWithPassword({
-        email: parsed.data.email,
-        password: parsed.data.password,
-      });
-      if (signInError) {
-        setLoading(false);
-        toast.error(signInError.message);
-        return;
-      }
-    }
     setLoading(false);
-    toast.success("Account created");
-    if (invite) {
-      navigate({ to: "/accept-invite/$token", params: { token: invite } });
-    } else {
-      navigate({ to: "/onboarding" });
-    }
+    toast.success("Account created. Check your email to verify it.");
+    navigate({ to: "/verify-email", search: { email: parsed.data.email, invite } });
   }
 
   async function handleSignin(e: React.FormEvent) {
     e.preventDefault();
-    const parsed = z.object({
-      email: z.string().trim().email("Invalid email"),
-      password: z.string().min(1, "Password is required"),
-    }).safeParse({ email, password });
+    const parsed = z
+      .object({
+        email: z.string().trim().email("Invalid email"),
+        password: z.string().min(1, "Password is required"),
+      })
+      .safeParse({ email, password });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message);
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.signInWithPassword(parsed.data);
+    const { error } = await authClient.signIn.email({ ...parsed.data, callbackURL: "/app" });
     setLoading(false);
     if (error) {
       toast.error(error.message);
@@ -107,7 +93,7 @@ function AuthPage() {
     if (invite) {
       navigate({ to: "/accept-invite/$token", params: { token: invite } });
     } else {
-      navigate({ to: "/onboarding" });
+      navigate({ to: "/app" });
     }
   }
 
@@ -119,7 +105,10 @@ function AuthPage() {
         footer={
           <>
             Already have an account?{" "}
-            <button className="text-foreground underline underline-offset-4" onClick={() => setMode("signin")}>
+            <button
+              className="text-foreground underline underline-offset-4"
+              onClick={() => setMode("signin")}
+            >
               Sign in
             </button>
           </>
@@ -127,13 +116,31 @@ function AuthPage() {
       >
         <form onSubmit={handleSignup} className="space-y-4">
           <Field label="Full name">
-            <Input value={fullName} onChange={(e) => setFullName(e.target.value)} autoComplete="name" required />
+            <Input
+              value={fullName}
+              onChange={(e) => setFullName(e.target.value)}
+              autoComplete="name"
+              required
+            />
           </Field>
           <Field label="Email">
-            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+            <Input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              autoComplete="email"
+              required
+            />
           </Field>
           <Field label="Password">
-            <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="new-password" required minLength={8} />
+            <Input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              autoComplete="new-password"
+              required
+              minLength={8}
+            />
           </Field>
           <Button type="submit" className="w-full" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -151,7 +158,10 @@ function AuthPage() {
       footer={
         <>
           New to Helix?{" "}
-          <button className="text-foreground underline underline-offset-4" onClick={() => setMode("signup")}>
+          <button
+            className="text-foreground underline underline-offset-4"
+            onClick={() => setMode("signup")}
+          >
             Create an account
           </button>
         </>
@@ -159,17 +169,32 @@ function AuthPage() {
     >
       <form onSubmit={handleSignin} className="space-y-4">
         <Field label="Email">
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+          />
         </Field>
         <Field
           label="Password"
           aside={
-            <Link to="/forgot-password" className="text-xs text-muted-foreground hover:text-foreground">
+            <Link
+              to="/forgot-password"
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
               Forgot?
             </Link>
           }
         >
-          <Input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required />
+          <Input
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoComplete="current-password"
+            required
+          />
         </Field>
         <Button type="submit" className="w-full" disabled={loading}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -180,7 +205,15 @@ function AuthPage() {
   );
 }
 
-function Field({ label, aside, children }: { label: string; aside?: React.ReactNode; children: React.ReactNode }) {
+function Field({
+  label,
+  aside,
+  children,
+}: {
+  label: string;
+  aside?: React.ReactNode;
+  children: React.ReactNode;
+}) {
   return (
     <div className="space-y-1.5">
       <div className="flex items-center justify-between">

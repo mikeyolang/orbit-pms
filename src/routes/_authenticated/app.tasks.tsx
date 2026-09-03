@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { useAuthSession } from "@/lib/auth";
 import { useOrg } from "@/components/app/app-shell";
 import { Badge } from "@/components/ui/badge";
@@ -48,7 +48,7 @@ function MyTasksPage() {
   const load = useCallback(async () => {
     if (!user) return;
     setTasks(null);
-    const { data: projects } = await supabase
+    const { data: projects } = await postgres
       .from("projects")
       .select("id")
       .eq("organization_id", currentOrg.organization_id);
@@ -57,7 +57,7 @@ function MyTasksPage() {
       setTasks([]);
       return;
     }
-    const { data } = await supabase
+    const { data } = await postgres
       .from("tasks")
       .select("id, number, title, status, priority, due_date, updated_at, project:projects(id, key, name, color)")
       .eq("assignee_id", user.id)

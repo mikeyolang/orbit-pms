@@ -1,4 +1,4 @@
-import type { Database } from "@/integrations/supabase/types";
+import type { Database } from "@/lib/database-types";
 
 export type Project = Database["public"]["Tables"]["projects"]["Row"];
 export type Task = Database["public"]["Tables"]["tasks"]["Row"];

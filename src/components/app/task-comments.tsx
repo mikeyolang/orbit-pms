@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
@@ -35,8 +35,8 @@ export function TaskCommentsActivity({ taskId }: { taskId: string }) {
 
   async function loadAll() {
     const [{ data: c }, { data: a }] = await Promise.all([
-      supabase.from("task_comments").select("*").eq("task_id", taskId).order("created_at"),
-      supabase.from("task_activity").select("*").eq("task_id", taskId).order("created_at", { ascending: false }).limit(50),
+      postgres.from("task_comments").select("*").eq("task_id", taskId).order("created_at"),
+      postgres.from("task_activity").select("*").eq("task_id", taskId).order("created_at", { ascending: false }).limit(50),
     ]);
     const userIds = Array.from(new Set([
       ...((c ?? []).map((x) => x.author_id)),
@@ -44,7 +44,7 @@ export function TaskCommentsActivity({ taskId }: { taskId: string }) {
     ]));
     const profileMap = new Map<string, { full_name: string | null; email: string | null }>();
     if (userIds.length) {
-      const { data: profs } = await supabase.from("profiles").select("id, full_name, email").in("id", userIds);
+      const { data: profs } = await postgres.from("profiles").select("id, full_name, email").in("id", userIds);
       (profs ?? []).forEach((p) => profileMap.set(p.id, { full_name: p.full_name, email: p.email }));
     }
     setComments((c ?? []).map((x) => ({ ...x, author: profileMap.get(x.author_id) ?? null })) as Comment[]);
@@ -56,14 +56,14 @@ export function TaskCommentsActivity({ taskId }: { taskId: string }) {
   }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => setMe(data.user?.id ?? null));
+    postgres.auth.getUser().then(({ data }) => setMe(data.user?.id ?? null));
     loadAll();
-    const channel = supabase
+    const channel = postgres
       .channel(`task-${taskId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "task_comments", filter: `task_id=eq.${taskId}` }, () => loadAll())
       .on("postgres_changes", { event: "*", schema: "public", table: "task_activity", filter: `task_id=eq.${taskId}` }, () => loadAll())
       .subscribe();
-    return () => { supabase.removeChannel(channel); };
+    return () => { postgres.removeChannel(channel); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [taskId]);
 
@@ -71,19 +71,19 @@ export function TaskCommentsActivity({ taskId }: { taskId: string }) {
     if (!body.trim()) return;
     if (!me) return;
     setPosting(true);
-    const { error } = await supabase.from("task_comments").insert({
+    const { error } = await postgres.from("task_comments").insert({
       task_id: taskId, author_id: me, body: body.trim(),
     });
     setPosting(false);
     if (error) return toast.error(error.message);
     setBody("");
-    await supabase.from("task_activity").insert({
+    await postgres.from("task_activity").insert({
       task_id: taskId, actor_id: me, action: "commented", payload: {},
     });
   }
 
   async function deleteComment(id: string) {
-    const { error } = await supabase.from("task_comments").delete().eq("id", id);
+    const { error } = await postgres.from("task_comments").delete().eq("id", id);
     if (error) toast.error(error.message);
   }
 

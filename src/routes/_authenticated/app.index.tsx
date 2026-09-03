@@ -35,7 +35,7 @@ import {
   TrendingUp,
   Users,
 } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { useOrg } from "@/components/app/app-shell";
 import { NewProjectDialog } from "@/components/app/new-project-dialog";
 import { Badge } from "@/components/ui/badge";
@@ -195,15 +195,15 @@ function Dashboard() {
   const reloadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const loadDashboard = useCallback(async () => {
-    const { data: userData } = await supabase.auth.getUser();
+    const { data: userData } = await postgres.auth.getUser();
     const [{ data: projectsData }, { data: membersData }] = await Promise.all([
-      supabase
+      postgres
         .from("projects")
         .select("*")
         .eq("organization_id", orgId)
         .is("archived_at", null)
         .order("created_at", { ascending: false }),
-      supabase
+      postgres
         .from("organization_members")
         .select("user_id, role")
         .eq("organization_id", orgId),
@@ -213,7 +213,7 @@ function Dashboard() {
     const memberRows = (membersData ?? []) as MemberBaseRow[];
     const memberIds = Array.from(new Set(memberRows.map((member) => member.user_id)));
     const { data: profilesData } = memberIds.length > 0
-      ? await supabase.from("profiles").select("id, full_name, email").in("id", memberIds)
+      ? await postgres.from("profiles").select("id, full_name, email").in("id", memberIds)
       : { data: [] as ProfileRow[] };
     const profileById = new Map((profilesData ?? []).map((profile) => [profile.id, profile]));
     const members: MemberRow[] = memberRows.map((member) => ({
@@ -227,18 +227,18 @@ function Dashboard() {
 
     if (projectIds.length > 0) {
       const [taskResult, sprintResult, milestoneResult] = await Promise.all([
-        supabase
+        postgres
           .from("tasks")
           .select("*")
           .in("project_id", projectIds)
           .order("updated_at", { ascending: false })
           .limit(1000),
-        supabase
+        postgres
           .from("sprints")
           .select("*")
           .in("project_id", projectIds)
           .order("start_date", { ascending: true, nullsFirst: false }),
-        supabase
+        postgres
           .from("milestones")
           .select("*")
           .in("project_id", projectIds)
@@ -279,7 +279,7 @@ function Dashboard() {
         loadDashboard();
       }, 350);
     };
-    const channel = supabase
+    const channel = postgres
       .channel(`dashboard:${orgId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, scheduleReload)
       .on("postgres_changes", { event: "*", schema: "public", table: "projects" }, scheduleReload)
@@ -288,7 +288,7 @@ function Dashboard() {
       .subscribe((status) => setLive(status === "SUBSCRIBED"));
     return () => {
       if (reloadTimerRef.current) clearTimeout(reloadTimerRef.current);
-      supabase.removeChannel(channel);
+      postgres.removeChannel(channel);
     };
   }, [orgId, loadDashboard]);
 

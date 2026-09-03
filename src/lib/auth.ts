@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import type { Session, User } from "@supabase/supabase-js";
+import { authClient } from "@/lib/auth-client";
+import { getMyMemberships } from "@/lib/api/session.functions";
 
 export type OrgRole = "owner" | "admin" | "manager" | "member" | "viewer";
 
@@ -8,27 +8,27 @@ export interface OrgMembership {
   organization_id: string;
   role: OrgRole;
   organization: { id: string; name: string; slug: string; invite_code?: string | null };
+  is_support_only?: boolean;
 }
+
+export type AppUser = {
+  id: string;
+  name: string;
+  email: string;
+  emailVerified: boolean;
+  image?: string | null;
+};
 
 export function useAuthSession() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    const { data: sub } = supabase.auth.onAuthStateChange((_evt, s) => {
-      setSession(s);
-    });
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setLoading(false);
-    });
-    return () => sub.subscription.unsubscribe();
-  }, []);
-
-  return { session, user: session?.user ?? null, loading };
+  const session = authClient.useSession();
+  return {
+    session: session.data ?? null,
+    user: session.data?.user ?? null,
+    loading: session.isPending,
+  };
 }
 
-export function useMemberships(user: User | null) {
+export function useMemberships(user: AppUser | null) {
   const [memberships, setMemberships] = useState<OrgMembership[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadedForUserId, setLoadedForUserId] = useState<string | null>(null);
@@ -41,18 +41,23 @@ export function useMemberships(user: User | null) {
       return;
     }
     setLoading(true);
-    const { data, error } = await supabase
-      .from("organization_members")
-      .select("organization_id, role, organization:organizations(id, name, slug, invite_code)")
-      .eq("user_id", user.id);
-    if (!error && data) {
-      const rank: Record<OrgRole, number> = { owner: 5, admin: 4, manager: 3, member: 2, viewer: 1 };
+    try {
+      const data = await getMyMemberships();
+      const rank: Record<OrgRole, number> = {
+        owner: 5,
+        admin: 4,
+        manager: 3,
+        member: 2,
+        viewer: 1,
+      };
       const byOrg = new Map<string, OrgMembership>();
       for (const row of data as unknown as OrgMembership[]) {
         const existing = byOrg.get(row.organization_id);
         if (!existing || rank[row.role] > rank[existing.role]) byOrg.set(row.organization_id, row);
       }
       setMemberships(Array.from(byOrg.values()));
+    } catch {
+      setMemberships([]);
     }
     setLoadedForUserId(user.id);
     setLoading(false);

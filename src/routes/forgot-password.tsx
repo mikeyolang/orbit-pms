@@ -1,7 +1,7 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { authClient } from "@/lib/auth-client";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,7 +14,6 @@ export const Route = createFileRoute("/forgot-password")({
 });
 
 function ForgotPassword() {
-  const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -26,14 +25,16 @@ function ForgotPassword() {
       return;
     }
     setLoading(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(parsed.data);
+    const { error } = await authClient.requestPasswordReset({
+      email: parsed.data,
+      redirectTo: "/reset-password",
+    });
     setLoading(false);
     if (error) {
       toast.error(error.message);
       return;
     }
-    toast.success("If an account exists, a code is on its way");
-    navigate({ to: "/reset-password", search: { email: parsed.data } });
+    toast.success("If an account exists, a reset link is on its way");
   }
 
   return (
@@ -49,7 +50,13 @@ function ForgotPassword() {
       <form onSubmit={submit} className="space-y-4">
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-muted-foreground">Email</Label>
-          <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="email" required />
+          <Input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            autoComplete="email"
+            required
+          />
         </div>
         <Button type="submit" className="w-full" disabled={loading}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

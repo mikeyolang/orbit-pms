@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,16 +49,16 @@ export function NewTaskDialog({
   useEffect(() => {
     if (!open) return;
     (async () => {
-      const { data: project } = await supabase.from("projects").select("organization_id").eq("id", projectId).single();
+      const { data: project } = await postgres.from("projects").select("organization_id").eq("id", projectId).single();
       if (!project) return;
       const [{ data: mems }, { data: sp }, { data: ms }] = await Promise.all([
-        supabase.from("organization_members").select("user_id").eq("organization_id", project.organization_id),
-        supabase.from("sprints").select("*").eq("project_id", projectId).neq("status", "completed").order("start_date"),
-        supabase.from("milestones").select("*").eq("project_id", projectId).neq("status", "completed").order("due_date"),
+        postgres.from("organization_members").select("user_id").eq("organization_id", project.organization_id),
+        postgres.from("sprints").select("*").eq("project_id", projectId).neq("status", "completed").order("start_date"),
+        postgres.from("milestones").select("*").eq("project_id", projectId).neq("status", "completed").order("due_date"),
       ]);
       const ids = (mems ?? []).map((m) => m.user_id);
       const { data: profiles } = ids.length
-        ? await supabase.from("profiles").select("id, full_name, email").in("id", ids)
+        ? await postgres.from("profiles").select("id, full_name, email").in("id", ids)
         : { data: [] as { id: string; full_name: string | null; email: string }[] };
       setMembers((profiles ?? []).map((p) => ({ user_id: p.id, full_name: p.full_name, email: p.email })));
       setSprints(sp ?? []);
@@ -72,9 +72,9 @@ export function NewTaskDialog({
     if (!parsed.success) return toast.error(parsed.error.issues[0].message);
 
     setLoading(true);
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u } = await postgres.auth.getUser();
     if (!u.user) { setLoading(false); return; }
-    const { error } = await supabase.from("tasks").insert({
+    const { error } = await postgres.from("tasks").insert({
       project_id: projectId,
       title: parsed.data.title,
       description: description.trim() || null,
@@ -203,7 +203,7 @@ function SprintSelect({
   async function save() {
     if (name.trim().length < 2) return;
     setBusy(true);
-    const { data, error } = await supabase.from("sprints").insert({
+    const { data, error } = await postgres.from("sprints").insert({
       project_id: projectId, name: name.trim(), status: "planned",
       start_date: new Date().toISOString().slice(0, 10),
       end_date: new Date(Date.now() + 14 * 86400_000).toISOString().slice(0, 10),
@@ -252,7 +252,7 @@ function MilestoneSelect({
   async function save() {
     if (name.trim().length < 2) return;
     setBusy(true);
-    const { data, error } = await supabase.from("milestones").insert({
+    const { data, error } = await postgres.from("milestones").insert({
       project_id: projectId, name: name.trim(), status: "upcoming",
     } as never).select().single();
     setBusy(false);

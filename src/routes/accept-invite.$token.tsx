@@ -1,96 +1,55 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useCallback, useEffect, useState } from "react";
+import { z } from "zod";
 import { AuthShell } from "@/components/auth/auth-shell";
 import { Button } from "@/components/ui/button";
-import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { authClient } from "@/lib/auth-client";
 import { setCurrentOrgId } from "@/lib/auth";
 
 export const Route = createFileRoute("/accept-invite/$token")({
+  validateSearch: z.object({ accept: z.coerce.boolean().optional() }),
   component: AcceptInvite,
 });
 
-interface Invite {
-  id: string;
-  organization_id: string;
-  email: string;
-  role: string;
-  expires_at: string;
-  accepted_at: string | null;
-  organization: { name: string };
-}
-
 function AcceptInvite() {
   const { token } = Route.useParams();
+  const { accept: acceptAfterVerification } = Route.useSearch();
   const navigate = useNavigate();
-  const [invite, setInvite] = useState<Invite | null>(null);
-  const [status, setStatus] = useState<"loading" | "ready" | "invalid" | "expired" | "accepted">("loading");
+  const [invite, setInvite] = useState<any>(null);
+  const [signedIn, setSignedIn] = useState(false);
+  const [error, setError] = useState("");
   const [working, setWorking] = useState(false);
 
+  const respond = useCallback(async (action: "accept" | "decline") => {
+    setWorking(true); setError("");
+    const response = await fetch(`/api/invitation/${token}`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ action }) });
+    const body = await response.json(); setWorking(false);
+    if (!response.ok) return setError(body.error);
+    if (action === "accept") { setCurrentOrgId(body.organizationId); navigate({ to: "/app", replace: true }); }
+    else setError("Invitation declined. You can close this page.");
+  }, [navigate, token]);
+
   useEffect(() => {
-    (async () => {
-      const { data } = await supabase
-        .from("invitations")
-        .select("id, organization_id, email, role, expires_at, accepted_at, organization:organizations(name)")
-        .eq("token", token)
-        .maybeSingle();
-      if (!data) return setStatus("invalid");
-      const inv = data as unknown as Invite;
-      setInvite(inv);
-      if (inv.accepted_at) setStatus("accepted");
-      else if (new Date(inv.expires_at) < new Date()) setStatus("expired");
-      else setStatus("ready");
-    })();
-  }, [token]);
+    Promise.all([fetch(`/api/invitation/${token}`).then(async (response) => ({ ok: response.ok, body: await response.json() })), authClient.getSession()]).then(([result, session]) => {
+      if (!result.ok) return setError(result.body.error);
+      setInvite(result.body.invite); setSignedIn(Boolean(session.data?.user));
+      if (acceptAfterVerification && session.data?.user && !result.body.invite.accepted_at && !result.body.invite.declined_at && !result.body.invite.revoked_at) void respond("accept");
+    });
+  }, [acceptAfterVerification, respond, token]);
 
-  async function accept() {
-    if (!invite) return;
-    setWorking(true);
-    const { data: u } = await supabase.auth.getUser();
-    if (!u.user) {
-      // Send to signup with email prefilled + invite token
-      navigate({ to: "/auth", search: { mode: "signup", email: invite.email, invite: token } });
-      return;
-    }
-    if (u.user.email?.toLowerCase() !== invite.email.toLowerCase()) {
-      setWorking(false);
-      toast.error(`This invite is for ${invite.email}. Sign in with that email to accept.`);
-      return;
-    }
-    const { error: memErr } = await supabase
-      .from("organization_members")
-      .insert({ organization_id: invite.organization_id, user_id: u.user.id, role: invite.role as never });
-    if (memErr && !memErr.message.includes("duplicate")) {
-      setWorking(false);
-      return toast.error(memErr.message);
-    }
-    await supabase.from("invitations").update({ accepted_at: new Date().toISOString() }).eq("id", invite.id);
-    setCurrentOrgId(invite.organization_id);
-    toast.success(`Welcome to ${invite.organization.name}`);
-    navigate({ to: "/app" });
+  function continueToAuth(mode: "signin" | "signup") {
+    navigate({ to: "/auth", search: { mode, email: invite.email, invite: token } });
   }
 
-  if (status === "loading") {
-    return (
-      <AuthShell title="Loading invite…">
-        <div className="flex justify-center"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
-      </AuthShell>
-    );
-  }
-  if (status === "invalid") return <AuthShell title="Invalid invitation" subtitle="This link is not valid." />;
-  if (status === "expired") return <AuthShell title="Invitation expired" subtitle="Ask an admin to send a new one." />;
-  if (status === "accepted") return <AuthShell title="Already accepted" subtitle="You've already joined this workspace." />;
+  if (error && !invite) return <AuthShell title="Invitation unavailable" subtitle={error} />;
+  if (!invite) return <AuthShell title="Loading invitation…" />;
+  if (invite.accepted_at || invite.declined_at || invite.revoked_at || new Date(invite.expires_at) < new Date()) return <AuthShell title="Invitation closed" subtitle="This invitation has already been answered, revoked, or has expired." />;
 
-  return (
-    <AuthShell
-      title={`Join ${invite!.organization.name}`}
-      subtitle={`Invited as ${invite!.role} • ${invite!.email}`}
-    >
-      <Button className="w-full" onClick={accept} disabled={working}>
-        {working && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-        Accept invitation
-      </Button>
-    </AuthShell>
-  );
+  return <AuthShell title={`Join ${invite.organization_name}`} subtitle={`You have been invited as ${invite.role_name ?? invite.role}`}>
+    <div className="space-y-3">
+      <div className="rounded-lg border bg-muted/30 p-3 text-sm"><div className="text-xs text-muted-foreground">Invitation sent to</div><div className="font-medium">{invite.email}</div></div>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+      {signedIn ? <><Button className="w-full" disabled={working} onClick={() => respond("accept")}>Accept and open workspace</Button><Button className="w-full" variant="outline" disabled={working} onClick={() => respond("decline")}>Decline invitation</Button></> : invite.has_account ? <Button className="w-full" onClick={() => continueToAuth("signin")}>Sign in to accept</Button> : <><Button className="w-full" onClick={() => continueToAuth("signup")}>Create account and join</Button><p className="text-center text-xs text-muted-foreground">After verifying your email, you’ll be added and taken directly to the workspace.</p></>}
+    </div>
+  </AuthShell>;
 }

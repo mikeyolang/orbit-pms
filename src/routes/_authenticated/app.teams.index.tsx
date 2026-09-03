@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { useOrg } from "@/components/app/app-shell";
 import { useAuthSession } from "@/lib/auth";
 import { Button } from "@/components/ui/button";
@@ -69,7 +69,7 @@ function TeamsPage() {
   const [taskCounts, setTaskCounts] = useState<Record<string, { total: number; open: number }>>({});
 
   const load = useCallback(async () => {
-    const { data: teamsData } = await supabase
+    const { data: teamsData } = await postgres
       .from("teams")
       .select("*")
       .eq("organization_id", orgId)
@@ -77,14 +77,14 @@ function TeamsPage() {
     const list = (teamsData ?? []) as Team[];
     setTeams(list);
 
-    const { data: memRows } = await supabase
+    const { data: memRows } = await postgres
       .from("organization_members")
       .select("user_id, role")
       .eq("organization_id", orgId);
     const rows = memRows ?? [];
     const ids = rows.map((m) => m.user_id);
     const { data: profiles } = ids.length
-      ? await supabase.from("profiles").select("id, full_name, email").in("id", ids)
+      ? await postgres.from("profiles").select("id, full_name, email").in("id", ids)
       : { data: [] as { id: string; full_name: string | null; email: string | null }[] };
     const byId = new Map((profiles ?? []).map((p) => [p.id, p]));
     setMembers(
@@ -102,8 +102,8 @@ function TeamsPage() {
     if (list.length > 0) {
       const teamIds = list.map((t) => t.id);
       const [{ data: tm }, { data: tasks }] = await Promise.all([
-        supabase.from("team_members").select("team_id, user_id, role").in("team_id", teamIds),
-        supabase.from("tasks").select("team_id, status").in("team_id", teamIds),
+        postgres.from("team_members").select("team_id, user_id, role").in("team_id", teamIds),
+        postgres.from("tasks").select("team_id, status").in("team_id", teamIds),
       ]);
       setTeamMembers((tm ?? []) as TeamMember[]);
       const counts: Record<string, { total: number; open: number }> = {};
@@ -125,12 +125,12 @@ function TeamsPage() {
 
   // Realtime
   useEffect(() => {
-    const ch = supabase
+    const ch = postgres
       .channel(`teams:${orgId}`)
       .on("postgres_changes", { event: "*", schema: "public", table: "teams" }, () => load())
       .on("postgres_changes", { event: "*", schema: "public", table: "team_members" }, () => load())
       .subscribe();
-    return () => { supabase.removeChannel(ch); };
+    return () => { postgres.removeChannel(ch); };
   }, [orgId, load]);
 
   const membersByTeam = useMemo(() => {
@@ -145,7 +145,7 @@ function TeamsPage() {
 
   async function createPreset(preset: typeof PRESETS[number]) {
     if (!user) return;
-    const { error } = await supabase.from("teams").insert({
+    const { error } = await postgres.from("teams").insert({
       organization_id: orgId,
       name: preset.name,
       slug: preset.slug,
@@ -161,7 +161,7 @@ function TeamsPage() {
 
   async function deleteTeam(id: string, name: string) {
     if (!confirm(`Delete "${name}"? This will not delete tasks.`)) return;
-    const { error } = await supabase.from("teams").delete().eq("id", id);
+    const { error } = await postgres.from("teams").delete().eq("id", id);
     if (error) return toast.error(error.message);
     toast.success("Team deleted");
     load();
@@ -420,14 +420,14 @@ function ManageMembers({
 
   async function add() {
     if (pick === "none") return;
-    const { error } = await supabase.from("team_members").insert({ team_id: team.id, user_id: pick, role: "member" });
+    const { error } = await postgres.from("team_members").insert({ team_id: team.id, user_id: pick, role: "member" });
     if (error) return toast.error(error.message);
     setPick("none");
     onChanged();
   }
 
   async function remove(userId: string) {
-    const { error } = await supabase.from("team_members").delete().eq("team_id", team.id).eq("user_id", userId);
+    const { error } = await postgres.from("team_members").delete().eq("team_id", team.id).eq("user_id", userId);
     if (error) return toast.error(error.message);
     onChanged();
   }
@@ -497,7 +497,7 @@ function NewTeamDialog({ orgId, onCreated }: { orgId: string; onCreated: () => v
     if (!parsed.success) return toast.error(parsed.error.issues[0].message);
 
     setLoading(true);
-    const { error } = await supabase.from("teams").insert({
+    const { error } = await postgres.from("teams").insert({
       organization_id: orgId,
       name: parsed.data.name,
       slug: parsed.data.slug,

@@ -1,7 +1,8 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { useAuthSession } from "@/lib/auth";
+import { useMyPermissions } from "@/lib/permissions";
 import { useOrg } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +15,7 @@ import { ShiftCreateDialog } from "@/components/shifts/shift-create-dialog";
 import { EndShiftDialog } from "@/components/shifts/end-shift-dialog";
 import { SwapBoard } from "@/components/shifts/swap-board";
 import { SwapRequestDialog } from "@/components/shifts/swap-request-dialog";
+import { AbsenceCoveragePanel } from "@/components/shifts/absence-coverage-panel";
 import {
   colorForUser, initials, isOnShiftNow, dayShiftAtRange,
   type Shift, type ShiftType, type SwapRequest, type ShiftSettings,
@@ -31,6 +33,7 @@ function ShiftsPage() {
   const { currentOrg, role } = useOrg();
   const orgId = currentOrg.organization_id;
   const canManage = role === "owner" || role === "admin" || role === "manager";
+  const { can } = useMyPermissions(orgId);
 
   const [cursor, setCursor] = useState(new Date());
   const [shifts, setShifts] = useState<ShiftFull[]>([]);
@@ -51,13 +54,13 @@ function ShiftsPage() {
     const monthStart = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1).toISOString();
     const monthEnd = new Date(cursor.getFullYear(), cursor.getMonth() + 2, 0).toISOString();
     const [t, s, m, sw, cfg] = await Promise.all([
-      supabase.from("shift_types").select("*").eq("organization_id", orgId).order("sort_order"),
-      supabase.from("shifts").select("*, shift_type:shift_types(*)").eq("organization_id", orgId)
+      postgres.from("shift_types").select("*").eq("organization_id", orgId).order("sort_order"),
+      postgres.from("shifts").select("*, shift_type:shift_types(*)").eq("organization_id", orgId)
         .gte("start_at", monthStart).lte("start_at", monthEnd).order("start_at"),
-      supabase.from("organization_members").select("user_id").eq("organization_id", orgId),
-      supabase.from("shift_swap_requests").select("*, from_shift:shifts!from_shift_id(*, shift_type:shift_types(*))")
+      postgres.from("organization_members").select("user_id").eq("organization_id", orgId),
+      postgres.from("shift_swap_requests").select("*, from_shift:shifts!from_shift_id(*, shift_type:shift_types(*))")
         .eq("organization_id", orgId).in("status", ["pending", "approved"]),
-      supabase.from("shift_settings").select("*").eq("organization_id", orgId).maybeSingle(),
+      postgres.from("shift_settings").select("*").eq("organization_id", orgId).maybeSingle(),
     ]);
     setSettings((cfg.data as ShiftSettings) ?? null);
     setShiftTypes((t.data as ShiftType[]) ?? []);
@@ -67,7 +70,7 @@ function ShiftsPage() {
     );
     let profileMap: Record<string, { full_name: string | null; email: string | null }> = {};
     if (memberIds.length) {
-      const { data: profs } = await supabase
+      const { data: profs } = await postgres
         .from("profiles").select("id, full_name, email").in("id", memberIds);
       profileMap = Object.fromEntries(
         ((profs as { id: string; full_name: string | null; email: string | null }[]) ?? [])
@@ -100,13 +103,13 @@ function ShiftsPage() {
   async function copyPreviousMonth() {
     const prevStart = new Date(cursor.getFullYear(), cursor.getMonth() - 1, 1);
     const prevEnd = new Date(cursor.getFullYear(), cursor.getMonth(), 0, 23, 59, 59);
-    const { data: prev } = await supabase.from("shifts")
+    const { data: prev } = await postgres.from("shifts")
       .select("*, shift_type:shift_types(*)")
       .eq("organization_id", orgId)
       .gte("start_at", prevStart.toISOString())
       .lte("start_at", prevEnd.toISOString());
     if (!prev || prev.length === 0) return toast.info("Nothing to copy from the previous month");
-    const { data: u } = await supabase.auth.getUser();
+    const { data: u } = await postgres.auth.getUser();
     const rows = (prev as ShiftFull[]).map((s) => {
       const t = s.shift_type;
       const src = new Date(s.start_at);
@@ -118,7 +121,7 @@ function ShiftsPage() {
         start_at, end_at, notes: s.notes, created_by: u.user?.id ?? null,
       };
     });
-    const { error } = await supabase.from("shifts").insert(rows);
+    const { error } = await postgres.from("shifts").insert(rows);
     if (error) return toast.error(error.message);
     toast.success(`Copied ${rows.length} shifts to ${format(cursor, "MMMM yyyy")}`);
     load();
@@ -184,7 +187,9 @@ function ShiftsPage() {
         </div>
       )}
 
-      <SwapBoard requests={swaps} currentUserId={user?.id ?? ""} isManager={canManage} onChange={load} />
+      {user && <AbsenceCoveragePanel orgId={orgId} userId={user.id} canManage={canManage} shifts={shifts} members={members} onChanged={load} />}
+
+      <SwapBoard requests={swaps} currentUserId={user?.id ?? ""} isManager={canManage} members={members} onChange={load} />
 
       {loading ? (
         <div className="flex justify-center py-16"><Loader2 className="h-5 w-5 animate-spin text-muted-foreground" /></div>
@@ -259,10 +264,10 @@ function ShiftsPage() {
                 <Button onClick={() => { setEndTarget(detail.id); setDetail(null); }}>End shift</Button>
               </>
             )}
-            {detail && canManage && (
+            {detail && can("shifts.delete") && (
               <Button variant="ghost" onClick={async () => {
                 if (!confirm("Delete this shift?")) return;
-                const { error } = await supabase.from("shifts").delete().eq("id", detail.id);
+                const { error } = await postgres.from("shifts").delete().eq("id", detail.id);
                 if (error) return toast.error(error.message);
                 setDetail(null); load();
               }}>Delete</Button>

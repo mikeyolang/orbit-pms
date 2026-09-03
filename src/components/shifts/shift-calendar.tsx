@@ -3,7 +3,7 @@ import {
   DndContext, DragOverlay, useDraggable, useDroppable, PointerSensor, useSensor, useSensors,
   type DragEndEvent, type DragStartEvent,
 } from "@dnd-kit/core";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { toast } from "sonner";
 import { addDays, addMonths, endOfMonth, format, isSameDay, isSameMonth, startOfMonth, startOfWeek } from "date-fns";
 import { Button } from "@/components/ui/button";
@@ -68,7 +68,7 @@ export function ShiftCalendar({
       }
       patch.user_id = toUserId;
     }
-    const { error } = await supabase.from("shifts").update(patch).eq("id", shiftId);
+    const { error } = await postgres.from("shifts").update(patch).eq("id", shiftId);
     if (error) return toast.error(error.message);
     toast.success("Shift updated");
     onReload();

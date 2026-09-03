@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Plus } from "lucide-react";
@@ -44,7 +44,7 @@ export function KanbanBoard({
   useEffect(() => {
     const missing = assigneeIds.filter((id) => !profiles[id]);
     if (missing.length === 0) return;
-    supabase
+    postgres
       .from("profiles")
       .select("id, full_name, email")
       .in("id", missing)
@@ -73,7 +73,7 @@ export function KanbanBoard({
     const colMax = tasks
       .filter((t) => t.status === status)
       .reduce((m, t) => Math.max(m, t.order_index), 0);
-    const { error } = await supabase
+    const { error } = await postgres
       .from("tasks")
       .update({ status, order_index: colMax + 1024 })
       .eq("id", id);

@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { useAuthSession, setCurrentOrgId } from "@/lib/auth";
 import { useOrg } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
@@ -9,6 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ShiftSettingsPanel } from "@/components/shifts/shift-settings-panel";
+import { TaskApprovalPanel } from "@/components/app/task-approval-panel";
+import { Switch } from "@/components/ui/switch";
 import { toast } from "sonner";
 import { Loader2, Plus, LogOut } from "lucide-react";
 
@@ -29,10 +31,13 @@ function SettingsPage() {
   const [wsName, setWsName] = useState(currentOrg.organization.name);
   const [wsSlug, setWsSlug] = useState(currentOrg.organization.slug);
   const [savingWs, setSavingWs] = useState(false);
+  const [creationApproval, setCreationApproval] = useState(false);
+  const [completionApproval, setCompletionApproval] = useState(false);
+  const [savingTaskSettings, setSavingTaskSettings] = useState(false);
 
   useEffect(() => {
     if (!user) return;
-    supabase
+    postgres
       .from("profiles")
       .select("full_name")
       .eq("id", user.id)
@@ -45,11 +50,26 @@ function SettingsPage() {
     setWsSlug(currentOrg.organization.slug);
   }, [currentOrg]);
 
+  useEffect(() => {
+    postgres.from("organizations").select("require_task_creation_approval,require_task_completion_approval").eq("id", currentOrg.organization_id).single().then(({ data }) => {
+      setCreationApproval(Boolean(data?.require_task_creation_approval));
+      setCompletionApproval(Boolean(data?.require_task_completion_approval));
+    });
+  }, [currentOrg.organization_id]);
+
+  async function saveTaskSettings() {
+    setSavingTaskSettings(true);
+    const { error } = await postgres.from("organizations").update({ require_task_creation_approval: creationApproval, require_task_completion_approval: completionApproval }).eq("id", currentOrg.organization_id);
+    setSavingTaskSettings(false);
+    if (error) return toast.error(error.message);
+    toast.success("Task approval settings saved");
+  }
+
   async function saveProfile(e: React.FormEvent) {
     e.preventDefault();
     if (!user) return;
     setSavingProfile(true);
-    const { error } = await supabase.from("profiles").update({ full_name: fullName }).eq("id", user.id);
+    const { error } = await postgres.from("profiles").update({ full_name: fullName }).eq("id", user.id);
     setSavingProfile(false);
     if (error) return toast.error(error.message);
     toast.success("Profile updated");
@@ -65,7 +85,7 @@ function SettingsPage() {
       .safeParse({ name: wsName, slug: wsSlug });
     if (!parsed.success) return toast.error(parsed.error.issues[0].message);
     setSavingWs(true);
-    const { error } = await supabase
+    const { error } = await postgres
       .from("organizations")
       .update({ name: parsed.data.name, slug: parsed.data.slug })
       .eq("id", currentOrg.organization_id);
@@ -76,7 +96,7 @@ function SettingsPage() {
   }
 
   async function signOut() {
-    await supabase.auth.signOut();
+    await postgres.auth.signOut();
     navigate({ to: "/auth" });
   }
 
@@ -91,9 +111,22 @@ function SettingsPage() {
         <TabsList>
           <TabsTrigger value="general">General</TabsTrigger>
           <TabsTrigger value="shifts">Shifts</TabsTrigger>
+          <TabsTrigger value="tasks">Tasks</TabsTrigger>
         </TabsList>
         <TabsContent value="shifts" className="mt-4">
           <ShiftSettingsPanel orgId={currentOrg.organization_id} canManage={role === "owner" || role === "admin" || role === "manager"} />
+        </TabsContent>
+        <TabsContent value="tasks" className="mt-4 space-y-6">
+          <section className="rounded-xl border border-border bg-card p-6">
+            <h2 className="text-sm font-semibold">Task approvals</h2>
+            <p className="mt-1 text-xs text-muted-foreground">Control whether member actions need a manager’s approval.</p>
+            <div className="mt-5 space-y-4">
+              <label className="flex items-center justify-between gap-4"><span><span className="block text-sm font-medium">Approve new member tasks</span><span className="block text-xs text-muted-foreground">Member-created tasks stay private until approved.</span></span><Switch checked={creationApproval} onCheckedChange={setCreationApproval} disabled={!canManage} /></label>
+              <label className="flex items-center justify-between gap-4"><span><span className="block text-sm font-medium">Approve task completion</span><span className="block text-xs text-muted-foreground">Members submit completion instead of immediately closing tasks.</span></span><Switch checked={completionApproval} onCheckedChange={setCompletionApproval} disabled={!canManage} /></label>
+            </div>
+            {canManage && <Button size="sm" className="mt-5" disabled={savingTaskSettings} onClick={saveTaskSettings}>{savingTaskSettings && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save task settings</Button>}
+          </section>
+          {(role === "owner" || role === "admin" || role === "manager") && <TaskApprovalPanel orgId={currentOrg.organization_id} />}
         </TabsContent>
         <TabsContent value="general" className="mt-4 space-y-6">
 
@@ -179,4 +212,3 @@ function SettingsPage() {
     </div>
   );
 }
-

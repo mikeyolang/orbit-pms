@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { postgres } from "@/integrations/postgres/client";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -40,21 +40,21 @@ export function TaskDetailSheet({
   useEffect(() => {
     if (!t) return;
     (async () => {
-      const { data: project } = await supabase.from("projects").select("organization_id").eq("id", t.project_id).single();
+      const { data: project } = await postgres.from("projects").select("organization_id").eq("id", t.project_id).single();
       if (!project) return;
       const [{ data: mems }, { data: lbs }, { data: tlabels }, { data: subs }, { data: ds }, { data: all }] = await Promise.all([
-        supabase.from("organization_members").select("user_id").eq("organization_id", project.organization_id),
-        supabase.from("labels").select("*").eq("organization_id", project.organization_id).order("name"),
-        supabase.from("task_labels").select("label_id").eq("task_id", t.id),
-        supabase.from("tasks").select("*").eq("parent_task_id", t.id).order("number"),
-        supabase.from("task_dependencies")
+        postgres.from("organization_members").select("user_id").eq("organization_id", project.organization_id),
+        postgres.from("labels").select("*").eq("organization_id", project.organization_id).order("name"),
+        postgres.from("task_labels").select("label_id").eq("task_id", t.id),
+        postgres.from("tasks").select("*").eq("parent_task_id", t.id).order("number"),
+        postgres.from("task_dependencies")
           .select("id, depends_on:tasks!task_dependencies_depends_on_task_id_fkey(*)")
           .eq("task_id", t.id),
-        supabase.from("tasks").select("*").eq("project_id", t.project_id).neq("id", t.id).order("number"),
+        postgres.from("tasks").select("*").eq("project_id", t.project_id).neq("id", t.id).order("number"),
       ]);
       const ids = (mems ?? []).map((m) => m.user_id);
       const { data: profiles } = ids.length
-        ? await supabase.from("profiles").select("id, full_name, email").in("id", ids)
+        ? await postgres.from("profiles").select("id, full_name, email").in("id", ids)
         : { data: [] as { id: string; full_name: string | null; email: string }[] };
       setMembers((profiles ?? []).map((p) => ({ user_id: p.id, full_name: p.full_name, email: p.email })));
       setLabels(lbs ?? []);
@@ -72,11 +72,11 @@ export function TaskDetailSheet({
     const prev = t;
     const next = { ...t, ...updates };
     setT(next);
-    const { error } = await supabase.from("tasks").update(updates).eq("id", t.id);
+    const { error } = await postgres.from("tasks").update(updates).eq("id", t.id);
     if (error) { toast.error(error.message); setT(prev); return; }
     // log activity for important field changes
     try {
-      const { data: u } = await supabase.auth.getUser();
+      const { data: u } = await postgres.auth.getUser();
       const actor = u.user?.id ?? null;
       const events: { action: string; payload: Record<string, string> }[] = [];
       if (updates.status && updates.status !== prev.status) {
@@ -90,7 +90,7 @@ export function TaskDetailSheet({
         events.push({ action: "assigned", payload: { assignee: m?.full_name ?? m?.email ?? "Unassigned" } });
       }
       for (const e of events) {
-        await supabase.from("task_activity").insert({ task_id: t.id, actor_id: actor, action: e.action, payload: e.payload as never });
+        await postgres.from("task_activity").insert({ task_id: t.id, actor_id: actor, action: e.action, payload: e.payload as never });
       }
     } catch { /* non-blocking */ }
     onChanged();
@@ -99,17 +99,17 @@ export function TaskDetailSheet({
   async function toggleLabel(id: string) {
     if (!t) return;
     if (taskLabels.includes(id)) {
-      await supabase.from("task_labels").delete().eq("task_id", t.id).eq("label_id", id);
+      await postgres.from("task_labels").delete().eq("task_id", t.id).eq("label_id", id);
       setTaskLabels(taskLabels.filter((x) => x !== id));
     } else {
-      await supabase.from("task_labels").insert({ task_id: t.id, label_id: id });
+      await postgres.from("task_labels").insert({ task_id: t.id, label_id: id });
       setTaskLabels([...taskLabels, id]);
     }
   }
 
   async function addDep() {
     if (!t || addingDep === "none") return;
-    const { error } = await supabase.from("task_dependencies").insert({
+    const { error } = await postgres.from("task_dependencies").insert({
       task_id: t.id, depends_on_task_id: addingDep, type: "blocks",
     });
     if (error) return toast.error(error.message);
@@ -119,13 +119,13 @@ export function TaskDetailSheet({
   }
 
   async function removeDep(id: string) {
-    await supabase.from("task_dependencies").delete().eq("id", id);
+    await postgres.from("task_dependencies").delete().eq("id", id);
     setDeps(deps.filter((d) => d.id !== id));
   }
 
   async function deleteTask() {
     if (!t || !confirm("Delete this task?")) return;
-    const { error } = await supabase.from("tasks").delete().eq("id", t.id);
+    const { error } = await postgres.from("tasks").delete().eq("id", t.id);
     if (error) return toast.error(error.message);
     toast.success("Task deleted");
     onOpenChange(false);
@@ -211,7 +211,7 @@ export function TaskDetailSheet({
                 projectId={t.project_id}
                 parentTaskId={t.id}
                 onCreated={async () => {
-                  const { data } = await supabase.from("tasks").select("*").eq("parent_task_id", t.id).order("number");
+                  const { data } = await postgres.from("tasks").select("*").eq("parent_task_id", t.id).order("number");
                   setSubtasks(data ?? []);
                   onChanged();
                 }}

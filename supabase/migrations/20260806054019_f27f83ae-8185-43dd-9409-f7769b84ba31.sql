@@ -1,0 +1,1 @@
+ALTER TABLE public.shift_settings ADD COLUMN IF NOT EXISTS members_see_all_shifts boolean NOT NULL DEFAULT true;

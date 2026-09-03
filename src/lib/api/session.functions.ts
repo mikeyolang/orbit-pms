@@ -13,6 +13,8 @@ export const getMyMemberships = createServerFn({ method: "GET" }).handler(async 
       organization_id: schema.organizationMembers.organizationId,
       role: schema.organizationMembers.role,
       is_support_only: schema.organizationMembers.isSupportOnly,
+      can_access_projects: schema.organizationMembers.canAccessProjects,
+      can_access_shifts: schema.organizationMembers.canAccessShifts,
       organization: {
         id: schema.organizations.id,
         name: schema.organizations.name,

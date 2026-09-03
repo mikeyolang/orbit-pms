@@ -27,11 +27,13 @@ import {
   Gauge,
   ListChecks,
   Radio,
+  Play,
   Settings2,
   ShieldAlert,
   Sparkles,
   Target,
   Timer,
+  StopCircle,
   TrendingUp,
   Users,
 } from "lucide-react";
@@ -47,6 +49,8 @@ import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { TASK_PRIORITIES, TASK_STATUSES, type Milestone, type Project, type Sprint, type Task } from "@/lib/projects";
 import type { OrgRole } from "@/lib/auth";
+import { EndShiftDialog } from "@/components/shifts/end-shift-dialog";
+import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/app/")({
   component: Dashboard,
@@ -182,6 +186,64 @@ function useWidgetPrefs(orgId: string, userId: string | null) {
 }
 
 function Dashboard() {
+  const { currentOrg } = useOrg();
+  const shiftOnly = currentOrg.can_access_shifts !== false && currentOrg.can_access_projects === false;
+  return shiftOnly ? <ShiftOnlyDashboard /> : <ProjectDashboard />;
+}
+
+type PreviousShiftReport = {
+  id: string;
+  checked_out_at: string;
+  total_tickets: number;
+  total_value: string;
+  cancelled_tickets: number;
+  total_chats_received: number;
+  total_chats_handled: number;
+  total_chats_missed: number;
+  handover_notes: string | null;
+};
+type UpcomingShift = { id: string; start_at: string; end_at: string; status: string; shift_type: { label: string; color: string } | null };
+
+function ShiftOnlyDashboard() {
+  const { currentOrg } = useOrg();
+  const [reports, setReports] = useState<PreviousShiftReport[] | null>(null);
+  const [upcoming, setUpcoming] = useState<UpcomingShift[] | null>(null);
+  const [endTarget, setEndTarget] = useState<string | null>(null);
+  const [refreshKey, setRefreshKey] = useState(0);
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      const { data: auth } = await postgres.auth.getUser();
+      if (!auth.user) { if (!cancelled) { setReports([]); setUpcoming([]); } return; }
+      const [reportResult, shiftResult] = await Promise.all([
+        postgres.from("shift_reports").select("id,checked_out_at,total_tickets,total_value,cancelled_tickets,total_chats_received,total_chats_handled,total_chats_missed,handover_notes").eq("organization_id", currentOrg.organization_id).eq("user_id", auth.user.id).order("checked_out_at", { ascending: false }).limit(5),
+        postgres.from("shifts").select("id,start_at,end_at,status,shift_type:shift_types(label,color)").eq("organization_id", currentOrg.organization_id).eq("user_id", auth.user.id).gte("end_at", new Date().toISOString()).in("status", ["scheduled", "in_progress"]).order("start_at", { ascending: true }).limit(5),
+      ]);
+      if (!cancelled) { setReports((reportResult.data as PreviousShiftReport[]) ?? []); setUpcoming((shiftResult.data as unknown as UpcomingShift[]) ?? []); }
+    }
+    void load();
+    return () => { cancelled = true; };
+  }, [currentOrg.organization_id, refreshKey]);
+  const latestWithNote = reports?.find((report) => report.handover_notes?.trim());
+  const totals = (reports ?? []).reduce((sum, report) => ({ tickets: sum.tickets + Number(report.total_tickets), value: sum.value + Number(report.total_value), chats: sum.chats + report.total_chats_handled }), { tickets: 0, value: 0, chats: 0 });
+  async function startShift(id: string) {
+    const { error } = await postgres.from("shifts").update({ status: "in_progress", started_at: new Date().toISOString() }).eq("id", id).eq("status", "scheduled");
+    if (error) return toast.error(error.message);
+    toast.success("Shift started");
+    setRefreshKey((value) => value + 1);
+  }
+
+  return <div className="mx-auto max-w-6xl space-y-6 px-6 py-8 lg:px-8">
+    <div><div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarClock className="h-3.5 w-3.5" />Your shift dashboard · {formatDate(new Date().toISOString())}</div><h1 className="mt-2 text-3xl font-semibold tracking-tight">Welcome to {currentOrg.organization.name}</h1><p className="mt-1 text-sm text-muted-foreground">A quick summary of your recently completed shifts.</p></div>
+    {reports === null || upcoming === null ? <DashboardLoading /> : <>
+      <section className="rounded-xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-card to-card p-4 shadow-sm"><div className="flex items-center justify-between"><div><h2 className="font-semibold">Upcoming shifts</h2><p className="text-xs text-muted-foreground">Your next scheduled shifts.</p></div><Button asChild size="sm" variant="outline"><Link to="/app/shifts">Open calendar</Link></Button></div>{upcoming.length ? <div className="mt-3 grid gap-3 sm:grid-cols-2">{upcoming.map((shift) => { const ready = shift.status === "scheduled" && new Date(shift.start_at).getTime() <= Date.now() && new Date(shift.end_at).getTime() >= Date.now(); const active = shift.status === "in_progress"; return <div key={shift.id} className={`rounded-xl border p-4 shadow-sm ${active ? "border-emerald-500/40 bg-emerald-500/10" : "border-cyan-500/20 bg-background/65"}`}><div className="flex items-start gap-3"><span className="mt-1 h-3 w-3 rounded-full" style={{ backgroundColor: shift.shift_type?.color ?? "#06b6d4" }} /><div className="min-w-0 flex-1"><div className="font-medium">{shift.shift_type?.label ?? "Shift"}</div><div className="mt-1 text-sm text-muted-foreground">{new Date(shift.start_at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div><div className="text-xs text-muted-foreground">Until {new Date(shift.end_at).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" })}</div>{ready && <Button size="sm" className="mt-3 bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => void startShift(shift.id)}><Play className="h-4 w-4" />Start shift</Button>}{active && <Button size="sm" className="mt-3 bg-red-600 text-white hover:bg-red-700" onClick={() => setEndTarget(shift.id)}><StopCircle className="h-4 w-4" />End shift</Button>}</div></div></div>; })}</div> : <div className="mt-3 rounded-xl border border-dashed border-cyan-500/25 bg-background/40 p-8 text-center"><CalendarClock className="mx-auto h-6 w-6 text-cyan-600" /><p className="mt-2 text-sm font-medium">No upcoming shifts yet</p><p className="text-xs text-muted-foreground">New assignments will appear here automatically.</p></div>}</section>
+      {reports.length ? <><section className="grid gap-3 sm:grid-cols-3"><MetricCard title="Tickets from recent shifts" value={String(totals.tickets)} subtitle={`Across your last ${reports.length} shift${reports.length === 1 ? "" : "s"}`} icon={CheckSquare} tone="blue" /><MetricCard title="Ticket value" value={totals.value.toLocaleString(undefined, { minimumFractionDigits: 2 })} subtitle="From your recent checkouts" icon={TrendingUp} tone="emerald" /><MetricCard title="Chats handled" value={String(totals.chats)} subtitle="From your recent checkouts" icon={Activity} tone="violet" /></section>{latestWithNote?.handover_notes && <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4"><div className="text-xs font-semibold uppercase tracking-wide text-amber-600">Latest shift note</div><p className="mt-2 text-sm">{latestWithNote.handover_notes}</p><div className="mt-2 text-xs text-muted-foreground">Submitted {formatDate(latestWithNote.checked_out_at)}</div></section>}<section className="rounded-xl border border-indigo-500/20 bg-gradient-to-br from-indigo-500/10 via-card to-card p-4 shadow-sm"><div className="flex items-center justify-between"><div><h2 className="font-semibold">Previous shifts</h2><p className="text-xs text-muted-foreground">Your five most recent completed shift reports.</p></div><Button asChild size="sm" variant="outline"><Link to="/app/shift-reports">View all reports</Link></Button></div><div className="mt-3 divide-y rounded-lg border bg-background/55">{reports.map((report) => <div key={report.id} className="flex items-center justify-between gap-4 p-3 transition-colors hover:bg-indigo-500/5"><div><div className="text-sm font-medium">{formatDate(report.checked_out_at)}</div><div className="text-xs text-muted-foreground">{report.total_tickets} tickets · {Number(report.total_value).toLocaleString(undefined, { minimumFractionDigits: 2 })} · {report.total_chats_handled} chats handled · {report.total_chats_missed} missed</div></div><Button asChild size="sm" variant="ghost"><a href={`/api/shift-report/${report.id}/pdf`} target="_blank" rel="noreferrer">PDF</a></Button></div>)}</div></section></> : <div className="rounded-2xl border border-dashed border-indigo-500/25 bg-gradient-to-br from-indigo-500/10 via-card to-card px-6 py-10 text-center"><Activity className="mx-auto h-8 w-8 text-indigo-500" /><h2 className="mt-3 text-lg font-medium">No completed shift data yet</h2><p className="mt-1 text-sm text-muted-foreground">Your ticket and chat summaries will appear after your first checkout.</p></div>}
+    </>}
+    {endTarget && <EndShiftDialog open={!!endTarget} onOpenChange={(open) => !open && setEndTarget(null)} shiftId={endTarget} orgId={currentOrg.organization_id} onEnded={() => setRefreshKey((value) => value + 1)} />}
+  </div>;
+}
+
+function ProjectDashboard() {
   const { currentOrg, role } = useOrg();
   const orgId = currentOrg.organization_id;
   const canManage = role === "owner" || role === "admin";
@@ -305,16 +367,18 @@ function Dashboard() {
 
   return (
     <div className="mx-auto max-w-7xl px-6 py-8 lg:px-8">
-      <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="relative overflow-hidden bg-white p-6 shadow-sm dark:bg-slate-950 lg:p-8">
+        <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-indigo-100/60 blur-3xl dark:bg-indigo-500/10" />
+        <div className="relative flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
+          <div className="flex items-center gap-2 text-xs font-semibold text-indigo-600 dark:text-indigo-300">
             <Gauge className="h-3.5 w-3.5" />
             {isPersonal ? "Your personal dashboard" : "Executive command center"} · {formatDate(new Date().toISOString())}
           </div>
-          <h1 className="mt-2 text-3xl font-semibold tracking-tight">
+          <h1 className="mt-2 text-3xl font-bold tracking-tight text-slate-950 dark:text-white">
             {isPersonal ? "My workspace" : currentOrg.organization.name}
           </h1>
-          <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
+          <p className="mt-1 max-w-2xl text-sm text-slate-600 dark:text-slate-300">
             {isPersonal
               ? `Your tasks, sprints, and deadlines across ${currentOrg.organization.name}.`
               : "Manager-ready visibility across delivery progress, sprint health, workload, risk, and accountability."}
@@ -333,12 +397,13 @@ function Dashboard() {
             <Radio className={cn("h-3 w-3", live && "animate-pulse")} />
             {live ? "Live" : "Offline"}
           </span>
-          <Badge variant="outline" className="capitalize text-muted-foreground">
+          <Badge variant="outline" className="border-indigo-200 bg-indigo-50 capitalize text-indigo-700 dark:border-indigo-500/25 dark:bg-indigo-500/10 dark:text-indigo-200">
             {role} view
           </Badge>
           <WidgetEditor widgets={widgets} />
           {canCreate && <NewProjectDialog />}
         </div>
+      </div>
       </div>
 
 
@@ -382,10 +447,10 @@ function Dashboard() {
           </section>)}
 
           {show("signals") && (<section className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-            <MiniSignal label="Completed this week" value={analytics.completedThisWeek} icon={CheckCircle2} />
-            <MiniSignal label="Created this week" value={analytics.createdThisWeek} icon={ListChecks} />
-            <MiniSignal label="Due in 7 days" value={analytics.dueSoonTasks} icon={CalendarDays} />
-            <MiniSignal label="Needs review" value={analytics.reviewQueue.length} icon={CircleDot} />
+            <MiniSignal label="Completed this week" value={analytics.completedThisWeek} icon={CheckCircle2} tone="emerald" />
+            <MiniSignal label="Created this week" value={analytics.createdThisWeek} icon={ListChecks} tone="blue" />
+            <MiniSignal label="Due in 7 days" value={analytics.dueSoonTasks} icon={CalendarDays} tone="amber" />
+            <MiniSignal label="Needs review" value={analytics.reviewQueue.length} icon={CircleDot} tone="violet" />
           </section>)}
 
           {show("kpis") && (<section className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -482,7 +547,7 @@ function Dashboard() {
                     key={item.project.id}
                     to="/app/projects/$key"
                     params={{ key: item.project.key }}
-                    className="block rounded-xl border border-border/60 bg-background/35 p-3 transition-colors hover:bg-card/70"
+                    className="block rounded-xl border border-blue-500/15 bg-gradient-to-br from-blue-500/10 via-background/70 to-background/40 p-3 shadow-sm transition-all hover:-translate-y-0.5 hover:border-blue-500/30"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
@@ -517,7 +582,7 @@ function Dashboard() {
                   <EmptyPanel icon={Users} text="No team workload yet." />
                 ) : (
                   analytics.workload.map((member) => (
-                    <div key={member.userId} className="rounded-xl border border-border/60 bg-background/35 p-3">
+                    <div key={member.userId} className="rounded-xl border border-violet-500/15 bg-gradient-to-br from-violet-500/10 via-background/70 to-background/40 p-3 shadow-sm transition-transform hover:-translate-y-0.5">
                       <div className="flex items-center justify-between gap-3">
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">{member.name}</div>
@@ -553,7 +618,7 @@ function Dashboard() {
               </ChartContainer>
               <div className="mt-2 grid grid-cols-2 gap-2">
                 {analytics.priorityData.map((entry) => (
-                  <div key={entry.priority} className="rounded-lg border border-border/60 bg-background/35 px-3 py-2">
+                  <div key={entry.priority} className="rounded-lg border border-amber-500/15 bg-gradient-to-br from-amber-500/10 to-background/50 px-3 py-2 shadow-sm">
                     <div className="flex items-center gap-2 text-xs capitalize">
                       <span className="h-2 w-2 rounded-full" style={{ backgroundColor: PRIORITY_COLORS[entry.priority] }} />
                       {entry.label}
@@ -576,7 +641,7 @@ function Dashboard() {
                   <EmptyPanel icon={Timer} text="No active sprint. Start one from a project sprint board." />
                 ) : (
                   analytics.sprintPulse.map((sprint) => (
-                    <div key={sprint.id} className="rounded-xl border border-border/60 bg-background/35 p-4">
+                    <div key={sprint.id} className="rounded-xl border border-cyan-500/15 bg-gradient-to-br from-cyan-500/10 via-background/70 to-background/40 p-4 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
                         <div>
                           <div className="text-sm font-medium">{sprint.name}</div>
@@ -628,7 +693,7 @@ function Dashboard() {
                   <EmptyPanel icon={Target} text="No milestones planned yet." />
                 ) : (
                   analytics.milestoneTimeline.map((milestone) => (
-                    <div key={milestone.id} className="rounded-xl border border-border/60 bg-background/35 p-3">
+                    <div key={milestone.id} className="rounded-xl border border-indigo-500/15 bg-gradient-to-br from-indigo-500/10 via-background/70 to-background/40 p-3 shadow-sm">
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium">{milestone.name}</div>
@@ -947,19 +1012,27 @@ function KpiWidget({
     violet: "#c084fc",
     slate: "#94a3b8",
   }[tone];
+  const toneCard = {
+    emerald: "border-emerald-500 bg-emerald-600 text-white",
+    red: "border-red-500 bg-red-600 text-white",
+    blue: "border-blue-500 bg-blue-600 text-white",
+    amber: "border-amber-500 bg-amber-600 text-white",
+    violet: "border-violet-500 bg-violet-600 text-white",
+    slate: "border-slate-500 bg-slate-600 text-white",
+  }[tone];
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card/45 p-4 shadow-sm">
+    <div className={cn("rounded-2xl border p-4 shadow-sm transition-transform hover:-translate-y-0.5", toneCard)}>
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-xs text-muted-foreground">{title}</p>
-          <div className="mt-2 text-3xl font-semibold tracking-tight">{value}</div>
+          <p className="text-xs font-semibold text-white">{title}</p>
+          <div className="mt-2 text-3xl font-bold tracking-tight text-white">{value}</div>
         </div>
         <div className={cn("rounded-lg border p-1.5", toneAccent)}>
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">{hint}</p>
+      <p className="mt-2 text-xs font-medium text-white">{hint}</p>
       {typeof progress === "number" && <Progress value={progress} className="mt-3 h-1.5 bg-muted/60" />}
       {trend && trend.length > 0 && (
         <ChartContainer config={{ count: { label: "Overdue", color: strokeColor } }} className="mt-3 h-[48px] w-full">
@@ -1054,40 +1127,42 @@ function MetricCard({
   tone: "emerald" | "red" | "blue" | "amber" | "violet" | "slate";
   progress?: number;
 }) {
-  const toneClass = {
-    emerald: "from-emerald-500/20 text-emerald-300",
-    red: "from-red-500/20 text-red-300",
-    blue: "from-blue-500/20 text-blue-300",
-    amber: "from-amber-500/20 text-amber-300",
-    violet: "from-violet-500/20 text-violet-300",
-    slate: "from-slate-500/20 text-slate-300",
+  const tones = {
+    emerald: { card: "border-emerald-500 bg-emerald-600", icon: "bg-white/15 text-white" },
+    red: { card: "border-red-500 bg-red-600", icon: "bg-white/15 text-white" },
+    blue: { card: "border-blue-500 bg-blue-600", icon: "bg-white/15 text-white" },
+    amber: { card: "border-amber-500 bg-amber-600", icon: "bg-white/15 text-white" },
+    violet: { card: "border-violet-500 bg-violet-600", icon: "bg-white/15 text-white" },
+    slate: { card: "border-slate-500 bg-slate-600", icon: "bg-white/15 text-white" },
   }[tone];
 
   return (
-    <div className="rounded-2xl border border-border/60 bg-card/45 p-4 shadow-sm">
+    <div className={cn("relative overflow-hidden rounded-2xl border p-4 shadow-sm transition-transform hover:-translate-y-0.5", tones.card)}>
+      <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-current opacity-[0.035]" />
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-xs text-muted-foreground">{title}</p>
-          <div className="mt-2 text-3xl font-semibold tracking-tight">{value}</div>
+          <p className="text-xs font-semibold text-white">{title}</p>
+          <div className="mt-2 text-3xl font-bold tracking-tight text-white">{value}</div>
         </div>
-        <div className={cn("rounded-xl bg-gradient-to-br to-transparent p-2", toneClass)}>
+        <div className={cn("rounded-xl p-2 shadow-sm", tones.icon)}>
           <Icon className="h-4 w-4" />
         </div>
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">{subtitle}</p>
+      <p className="mt-2 text-xs font-medium text-white">{subtitle}</p>
       {typeof progress === "number" && <Progress value={progress} className="mt-3 h-1.5 bg-muted/60" />}
     </div>
   );
 }
 
-function MiniSignal({ label, value, icon: Icon }: { label: string; value: number; icon: typeof CheckCircle2 }) {
+function MiniSignal({ label, value, icon: Icon, tone }: { label: string; value: number; icon: typeof CheckCircle2; tone: "emerald" | "blue" | "amber" | "violet" }) {
+  const colors = { emerald: "border-emerald-500 bg-emerald-600", blue: "border-blue-500 bg-blue-600", amber: "border-amber-500 bg-amber-600", violet: "border-violet-500 bg-violet-600" }[tone];
   return (
-    <div className="flex items-center justify-between rounded-xl border border-border/60 bg-card/35 px-4 py-3">
+    <div className={cn("flex items-center justify-between rounded-xl border px-4 py-3 text-white shadow-sm transition-transform hover:-translate-y-0.5", colors)}>
       <div>
-        <div className="text-lg font-semibold">{value}</div>
-        <div className="text-xs text-muted-foreground">{label}</div>
+        <div className="text-lg font-bold text-white">{value}</div>
+        <div className="text-xs font-semibold text-white">{label}</div>
       </div>
-      <Icon className="h-4 w-4 text-muted-foreground" />
+      <div className="rounded-lg bg-current/10 p-2"><Icon className="h-4 w-4" /></div>
     </div>
   );
 }
@@ -1104,7 +1179,7 @@ function Panel({
   children: ReactNode;
 }) {
   return (
-    <section className="rounded-2xl border border-border/60 bg-card/40 p-5 shadow-sm">
+    <section className="rounded-2xl border border-primary/15 bg-gradient-to-br from-primary/[0.07] via-card to-card p-5 shadow-sm">
       <div className="mb-4 flex items-start justify-between gap-3">
         <div>
           <h2 className="text-sm font-medium">{title}</h2>
@@ -1129,17 +1204,17 @@ function ActionList({
   tone: "red" | "violet" | "amber" | "slate";
 }) {
   const toneClass = {
-    red: "text-red-400",
-    violet: "text-violet-400",
-    amber: "text-amber-400",
-    slate: "text-slate-400",
+    red: "border-red-500/20 from-red-500/12 text-red-500",
+    violet: "border-violet-500/20 from-violet-500/12 text-violet-500",
+    amber: "border-amber-500/20 from-amber-500/12 text-amber-500",
+    slate: "border-slate-500/20 from-slate-500/12 text-slate-500",
   }[tone];
 
   return (
-    <div className="rounded-xl border border-border/60 bg-background/35 p-3">
+    <div className={cn("rounded-xl border bg-gradient-to-br via-background/70 to-background/40 p-3 shadow-sm", toneClass)}>
       <div className="mb-3 flex items-center justify-between">
         <div className="flex items-center gap-2 text-sm font-medium">
-          <Icon className={cn("h-4 w-4", toneClass)} />
+          <Icon className="h-4 w-4" />
           {title}
         </div>
         <Badge variant="outline">{tasks.length}</Badge>
@@ -1159,7 +1234,7 @@ function TaskRow({ task, compact = false }: { task: Task; compact?: boolean }) {
   const overdue = isOverdue(task.due_date, startOfDay(new Date()));
   const status = TASK_STATUSES.find((item) => item.value === task.status)?.label ?? task.status;
   return (
-    <div className="rounded-lg border border-border/50 bg-card/35 px-3 py-2 text-sm">
+    <div className="rounded-lg border border-primary/10 bg-gradient-to-r from-primary/[0.06] to-card px-3 py-2 text-sm transition-colors hover:border-primary/25 hover:bg-primary/[0.08]">
       <div className="line-clamp-1 font-medium">{task.title}</div>
       <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
         <span className={cn("rounded px-1.5 py-0.5", statusColorMap[task.status])}>{status}</span>
@@ -1191,7 +1266,7 @@ function HealthBadge({ health }: { health: ProjectHealth["health"] }) {
 
 function EmptyPanel({ icon: Icon, text }: { icon: typeof Users; text: string }) {
   return (
-    <div className="grid place-items-center rounded-xl border border-dashed border-border/60 bg-background/30 px-4 py-10 text-center">
+    <div className="grid place-items-center rounded-xl border border-dashed border-primary/20 bg-gradient-to-br from-primary/[0.07] to-background/30 px-4 py-10 text-center">
       <Icon className="h-5 w-5 text-muted-foreground" />
       <p className="mt-2 text-xs text-muted-foreground">{text}</p>
     </div>
@@ -1200,7 +1275,7 @@ function EmptyPanel({ icon: Icon, text }: { icon: typeof Users; text: string }) 
 
 function EmptyWorkspace({ canCreate }: { canCreate: boolean }) {
   return (
-    <div className="mt-8 grid place-items-center rounded-2xl border border-dashed border-border/60 bg-card/30 px-6 py-16 text-center">
+    <div className="mt-8 grid place-items-center rounded-2xl border border-dashed border-primary/25 bg-gradient-to-br from-primary/10 via-card to-card px-6 py-16 text-center shadow-sm">
       <FolderKanban className="h-9 w-9 text-muted-foreground" />
       <h2 className="mt-4 text-lg font-medium">No projects yet</h2>
       <p className="mt-2 max-w-md text-sm text-muted-foreground">

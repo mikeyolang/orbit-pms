@@ -108,7 +108,7 @@ export function PermissionsPanel({ orgId, members, customRoles, onRolesChanged }
     e.preventDefault();
     const name = newRoleName.trim();
     if (!name) return toast.error("Enter a role name");
-    const { error } = await postgres.from("custom_roles").insert({ organization_id: orgId, name, base_role: newRoleBase });
+    const { error } = await postgres.from("custom_roles").insert({ organization_id: orgId, name, base_role: newRoleBase, can_access_projects: true, can_access_shifts: true });
     if (error) return toast.error(error.message);
     setNewRoleName("");
     toast.success(`${name} role created`);

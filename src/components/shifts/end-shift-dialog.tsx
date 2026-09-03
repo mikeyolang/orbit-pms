@@ -1,57 +1,21 @@
-import { useState } from "react";
-import { postgres } from "@/integrations/postgres/client";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Loader2, Search } from "lucide-react";
+import { postgres } from "@/integrations/postgres/client";
 
-export function EndShiftDialog({
-  open, onOpenChange, shiftId, onEnded,
-}: {
-  open: boolean;
-  onOpenChange: (v: boolean) => void;
-  shiftId: string;
-  onEnded?: () => void;
-}) {
-  const [comment, setComment] = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function submit() {
-    setLoading(true);
-    const { error } = await postgres
-      .from("shifts")
-      .update({ status: "ended", ended_at: new Date().toISOString(), end_comment: comment || null })
-      .eq("id", shiftId);
-    setLoading(false);
-    if (error) return toast.error(error.message);
-    toast.success("Shift ended");
-    setComment("");
-    onOpenChange(false);
-    onEnded?.();
-  }
-
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
-        <DialogHeader><DialogTitle>End shift</DialogTitle></DialogHeader>
-        <div className="space-y-2">
-          <Label className="text-xs text-muted-foreground">Handover comment (optional)</Label>
-          <Textarea
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            placeholder="Anything the next person on shift should know?"
-            rows={4}
-          />
-        </div>
-        <DialogFooter>
-          <Button variant="ghost" onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button onClick={submit} disabled={loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}End shift
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
+type Company={id:string;name:string}; type Entry={ticketsSold:string;totalValue:string;cancelledTickets:string;chatsReceived:string;chatsHandled:string;chatsMissed:string};
+export function EndShiftDialog({open,onOpenChange,shiftId,orgId,onEnded}:{open:boolean;onOpenChange:(v:boolean)=>void;shiftId:string;orgId:string;onEnded?:()=>void}){
+ const [companies,setCompanies]=useState<Company[]>([]),[entries,setEntries]=useState<Record<string,Entry>>({}),[search,setSearch]=useState(""),[handover,setHandover]=useState("");
+ const [unreached,setUnreached]=useState("0"),[vouchers,setVouchers]=useState("0"),[loading,setLoading]=useState(false);
+ useEffect(()=>{if(open)postgres.from("bus_companies").select("id,name").eq("organization_id",orgId).eq("is_active",true).order("name").then(({data})=>setCompanies(data??[]))},[open,orgId]);
+ const visible=useMemo(()=>companies.filter(c=>c.name.toLowerCase().includes(search.toLowerCase())),[companies,search]);
+ const setEntry=(id:string,patch:Partial<Entry>)=>setEntries(old=>({...old,[id]:{ticketsSold:old[id]?.ticketsSold??"0",totalValue:old[id]?.totalValue??"0",cancelledTickets:old[id]?.cancelledTickets??"0",chatsReceived:old[id]?.chatsReceived??"0",chatsHandled:old[id]?.chatsHandled??"0",chatsMissed:old[id]?.chatsMissed??"0",...patch}}));
+ async function submit(){setLoading(true);const response=await fetch("/api/shift-report",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({shiftId,unreachedClients:Number(unreached||0),vouchersIssued:Number(vouchers||0),handoverNotes:handover.trim()||null,companies:companies.map(c=>({companyId:c.id,ticketsSold:Number(entries[c.id]?.ticketsSold||0),totalValue:Number(entries[c.id]?.totalValue||0),cancelledTickets:Number(entries[c.id]?.cancelledTickets||0),chatsReceived:Number(entries[c.id]?.chatsReceived||0),chatsHandled:Number(entries[c.id]?.chatsHandled||0),chatsMissed:Number(entries[c.id]?.chatsMissed||0)}))})});const body=await response.json();setLoading(false);if(!response.ok)return toast.error(body.error);toast.success("Shift checked out and report sent");onOpenChange(false);onEnded?.();}
+ return <Dialog open={open} onOpenChange={onOpenChange}><DialogContent className="max-h-[90vh] max-w-6xl overflow-y-auto"><DialogHeader><DialogTitle>Check out and submit shift report</DialogTitle></DialogHeader><div className="space-y-5"><div><Label>Bus company activity</Label><p className="text-xs text-muted-foreground">Blank values are treated as zero. Companies with all zero values are omitted from the PDF detail.</p><div className="relative mt-2"><Search className="absolute left-3 top-2.5 h-4 w-4 text-muted-foreground"/><Input className="pl-9" value={search} onChange={e=>setSearch(e.target.value)} placeholder="Search bus companies"/></div><div className="mt-2 max-h-80 overflow-auto rounded-lg border"><div className="sticky top-0 grid min-w-[980px] grid-cols-[minmax(220px,1fr)_110px_130px_120px_110px_110px_110px] gap-2 border-b bg-muted p-2 text-[11px] font-medium"><span>Bus company</span><span>Tickets</span><span>Ticket value</span><span>Cancelled</span><span>Chats received</span><span>Chats handled</span><span>Chats missed</span></div>{visible.map(c=><div key={c.id} className="grid min-w-[980px] grid-cols-[minmax(220px,1fr)_110px_130px_120px_110px_110px_110px] items-center gap-2 border-b p-2 last:border-0"><span className="truncate text-sm">{c.name}</span><Metric value={entries[c.id]?.ticketsSold} onChange={v=>setEntry(c.id,{ticketsSold:v})}/><Metric value={entries[c.id]?.totalValue} step="0.01" onChange={v=>setEntry(c.id,{totalValue:v})}/><Metric value={entries[c.id]?.cancelledTickets} onChange={v=>setEntry(c.id,{cancelledTickets:v})}/><Metric value={entries[c.id]?.chatsReceived} onChange={v=>setEntry(c.id,{chatsReceived:v})}/><Metric value={entries[c.id]?.chatsHandled} onChange={v=>setEntry(c.id,{chatsHandled:v})}/><Metric value={entries[c.id]?.chatsMissed} onChange={v=>setEntry(c.id,{chatsMissed:v})}/></div>)}</div></div><div className="grid grid-cols-2 gap-3"><div><Label>Unreached clients</Label><Input type="number" min="0" value={unreached} onChange={e=>setUnreached(e.target.value)}/></div><div><Label>Vouchers issued</Label><Input type="number" min="0" value={vouchers} onChange={e=>setVouchers(e.target.value)}/></div></div><div><Label>Handover for the next shift</Label><Textarea rows={4} value={handover} onChange={e=>setHandover(e.target.value)} placeholder="Issues, pending clients, operational notes, or anything the next person needs to know."/></div></div><DialogFooter><Button variant="ghost" onClick={()=>onOpenChange(false)}>Cancel</Button><Button onClick={submit} disabled={loading}>{loading&&<Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Check out & send report</Button></DialogFooter></DialogContent></Dialog>;
 }
+function Metric({value,onChange,step="1"}:{value?:string;onChange:(value:string)=>void;step?:string}){return <Input type="number" min="0" step={step} value={value??""} onChange={e=>onChange(e.target.value)} placeholder="0"/>}

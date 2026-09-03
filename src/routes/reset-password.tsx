@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const search = z.object({ token: z.string().optional(), error: z.string().optional() });
 
@@ -22,13 +22,15 @@ function ResetPassword() {
   const [password, setPassword] = useState("");
   const [confirm, setConfirm] = useState("");
   const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirm, setShowConfirm] = useState(false);
 
   async function setNewPassword(e: React.FormEvent) {
     e.preventDefault();
     if (password.length < 8) return toast.error("Password must be at least 8 characters");
     if (password !== confirm) return toast.error("Passwords don't match");
-    setLoading(true);
     if (!token) return toast.error("This reset link is invalid or expired");
+    setLoading(true);
     const { error } = await authClient.resetPassword({ newPassword: password, token });
     setLoading(false);
     if (error) {
@@ -58,34 +60,24 @@ function ResetPassword() {
       <form onSubmit={setNewPassword} className="space-y-4">
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-muted-foreground">New password</Label>
-          <Input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            minLength={8}
-            required
-            autoComplete="new-password"
-          />
+          <PasswordField visible={showPassword} onToggle={() => setShowPassword((value) => !value)} value={password} onChange={(e) => setPassword(e.target.value)} />
           <PasswordStrength value={password} />
         </div>
         <div className="space-y-1.5">
           <Label className="text-xs font-medium text-muted-foreground">Confirm password</Label>
-          <Input
-            type="password"
-            value={confirm}
-            onChange={(e) => setConfirm(e.target.value)}
-            minLength={8}
-            required
-            autoComplete="new-password"
-          />
+          <PasswordField visible={showConfirm} onToggle={() => setShowConfirm((value) => !value)} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </div>
-        <Button type="submit" className="w-full" disabled={loading}>
+        <Button type="submit" className="w-full bg-gradient-to-r from-violet-600 to-blue-600 text-white hover:from-violet-700 hover:to-blue-700" disabled={loading}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Update password
         </Button>
       </form>
     </AuthShell>
   );
+}
+
+function PasswordField({ visible, onToggle, value, onChange }: { visible: boolean; onToggle: () => void; value: string; onChange: React.ChangeEventHandler<HTMLInputElement> }) {
+  return <div className="relative"><Input type={visible ? "text" : "password"} value={value} onChange={onChange} minLength={8} required autoComplete="new-password" className="h-11 bg-white pr-11 dark:bg-slate-950" /><button type="button" onClick={onToggle} className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted-foreground hover:text-foreground" aria-label={visible ? "Hide password" : "Show password"}>{visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}</button></div>;
 }
 
 function PasswordStrength({ value }: { value: string }) {

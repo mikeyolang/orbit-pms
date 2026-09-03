@@ -4,10 +4,10 @@ import { getServerConfig } from "@/lib/config.server";
 import { escapeEmailHtml, sendTransactionalEmail } from "./mail/mailgun.server";
 
 const TABLES = new Set([
-  "custom_role_permissions", "custom_roles", "invitations", "join_requests", "labels", "member_permissions", "milestones",
+  "bus_companies", "custom_role_permissions", "custom_roles", "invitations", "join_requests", "labels", "member_permissions", "milestones",
   "organization_members", "organizations", "profiles", "projects", "role_permissions",
   "shift_absences", "shift_coverage_offers", "shift_settings", "shift_swap_requests", "shift_types", "shifts", "sprints",
-  "task_activity", "task_comments", "task_dependencies", "task_labels", "tasks",
+  "shift_report_companies", "shift_reports", "task_activity", "task_comments", "task_dependencies", "task_labels", "tasks",
   "team_members", "teams", "system_notifications",
 ]);
 const FUNCTIONS = new Set([
@@ -15,6 +15,7 @@ const FUNCTIONS = new Set([
   "my_permissions", "request_or_join_by_code",
   "decide_task_approval",
   "approve_coverage_offer",
+  "latest_shift_handover",
 ]);
 const identifier = /^[a-z_][a-z0-9_]*$/;
 
@@ -161,6 +162,16 @@ export async function handleDataRequest(request: Request) {
         result = await client.query(sql, params);
       } else result = await client.query(mutationSql(body.operation, body.table, body, params), params);
       result.rows = await enrichRows(client, body.table, result.rows);
+      if (body.table === "tasks" && ["insert", "update", "upsert"].includes(body.operation)) {
+        for (const row of result.rows) if (row.assignee_id) {
+          const eligible = await client.query(
+            `SELECT 1 FROM projects p JOIN organization_members m ON m.organization_id=p.organization_id AND m.user_id=$2
+             WHERE p.id=$1 AND (m.can_access_projects=true OR m.role IN ('owner','admin'))`,
+            [row.project_id, row.assignee_id],
+          );
+          if (!eligible.rowCount) throw new Error("Tasks can only be assigned to members with Projects access");
+        }
+      }
     }
     await client.query("COMMIT");
     if (!["select", "rpc"].includes(body.operation)) {

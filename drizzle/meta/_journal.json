@@ -99,6 +99,48 @@
       "when": 1788444000000,
       "tag": "0013_swap_preferences_hr_integration",
       "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "7",
+      "when": 1788444600000,
+      "tag": "0014_modules_and_shift_reports",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "7",
+      "when": 1788444900000,
+      "tag": "0015_seed_bus_companies",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "7",
+      "when": 1788445200000,
+      "tag": "0016_module_manager_roles",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "7",
+      "when": 1788445500000,
+      "tag": "0017_scoped_module_invites",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "7",
+      "when": 1788445800000,
+      "tag": "0018_enforce_module_boundaries",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1788446400000,
+      "tag": "0019_company_ticket_chat_metrics",
+      "breakpoints": true
     }
   ]
 }

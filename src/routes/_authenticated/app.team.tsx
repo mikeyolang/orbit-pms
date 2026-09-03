@@ -15,8 +15,10 @@ import {
 } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Copy, Loader2, Mail, Trash2, UserPlus } from "lucide-react";
-import type { OrgRole } from "@/lib/auth";
+import { useAuthSession, type OrgRole } from "@/lib/auth";
 import { PermissionsPanel } from "@/components/app/permissions-panel";
+import { Switch } from "@/components/ui/switch";
+import { useMyPermissions } from "@/lib/permissions";
 
 export const Route = createFileRoute("/_authenticated/app/team")({
   component: TeamPage,
@@ -30,6 +32,9 @@ interface Member {
   role: OrgRole;
   custom_role_id: string | null;
   is_support_only: boolean;
+  can_access_projects: boolean;
+  can_access_shifts: boolean;
+  invited_by: string | null;
   profile: { full_name: string | null; email: string | null } | null;
 }
 
@@ -44,6 +49,8 @@ interface Invitation {
   declined_at: string | null;
   revoked_at: string | null;
   custom_role_id: string | null;
+  can_access_projects: boolean;
+  can_access_shifts: boolean;
 }
 
 export interface CustomRole {
@@ -51,12 +58,17 @@ export interface CustomRole {
   name: string;
   description: string | null;
   base_role: Exclude<OrgRole, "owner" | "admin">;
+  can_access_projects: boolean;
+  can_access_shifts: boolean;
 }
 
 function TeamPage() {
   const { currentOrg, role: myRole } = useOrg();
+  const { user: signedInUser } = useAuthSession();
   const orgId = currentOrg.organization_id;
   const canManage = myRole === "owner" || myRole === "admin";
+  const { can } = useMyPermissions(orgId);
+  const canInvite = canManage || can("members.invite");
 
   const [members, setMembers] = useState<Member[]>([]);
   const [invites, setInvites] = useState<Invitation[]>([]);
@@ -65,6 +77,8 @@ function TeamPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("base:member");
   const [inviting, setInviting] = useState(false);
+  const [inviteProjects, setInviteProjects] = useState(true);
+  const [inviteShifts, setInviteShifts] = useState(true);
   const inviteSectionRef = useRef<HTMLElement>(null);
   const inviteEmailRef = useRef<HTMLInputElement>(null);
 
@@ -73,14 +87,14 @@ function TeamPage() {
     const [m, i, r] = await Promise.all([
       postgres
         .from("organization_members")
-        .select("id, user_id, role, custom_role_id, is_support_only, profile:profiles(full_name, email)")
+        .select("id, user_id, role, custom_role_id, is_support_only, can_access_projects, can_access_shifts, invited_by, profile:profiles(full_name, email)")
         .eq("organization_id", orgId),
       postgres
         .from("invitations")
-        .select("id, email, role, token, code, expires_at, accepted_at, declined_at, revoked_at, custom_role_id")
+        .select("id, email, role, token, code, expires_at, accepted_at, declined_at, revoked_at, custom_role_id, can_access_projects, can_access_shifts")
         .eq("organization_id", orgId)
         .order("created_at", { ascending: false }),
-      postgres.from("custom_roles").select("id, name, description, base_role").eq("organization_id", orgId).order("name"),
+      postgres.from("custom_roles").select("id, name, description, base_role, can_access_projects, can_access_shifts").eq("organization_id", orgId).order("name"),
     ]);
     if (m.data) setMembers(m.data as unknown as Member[]);
     if (i.data) setInvites(i.data as unknown as Invitation[]);
@@ -92,10 +106,17 @@ function TeamPage() {
     load();
   }, [load]);
 
+  useEffect(() => {
+    if (!canManage) {
+      setInviteProjects(currentOrg.can_access_projects !== false);
+      setInviteShifts(currentOrg.can_access_shifts !== false);
+    }
+  }, [canManage, currentOrg.can_access_projects, currentOrg.can_access_shifts]);
+
   async function changeRole(memberId: string, selection: string) {
     const custom = selection.startsWith("custom:") ? customRoles.find((r) => r.id === selection.slice(7)) : null;
     const role = (custom?.base_role ?? selection.replace("base:", "")) as OrgRole;
-    const { error } = await postgres.from("organization_members").update({ role, custom_role_id: custom?.id ?? null }).eq("id", memberId);
+    const { error } = await postgres.from("organization_members").update({ role, custom_role_id: custom?.id ?? null, ...(custom ? { can_access_projects: custom.can_access_projects, can_access_shifts: custom.can_access_shifts } : {}) }).eq("id", memberId);
     if (error) return toast.error(error.message);
     toast.success("Role updated");
     load();
@@ -129,6 +150,8 @@ function TeamPage() {
       email: parsed.data,
       role: custom?.base_role ?? inviteRole.replace("base:", ""),
       custom_role_id: custom?.id ?? null,
+      can_access_projects: inviteProjects,
+      can_access_shifts: inviteShifts,
       invited_by: user.user!.id,
     });
     setInviting(false);
@@ -136,6 +159,12 @@ function TeamPage() {
     setInviteEmail("");
     toast.success("Invitation sent by email");
     load();
+  }
+
+  async function changeModules(memberId: string, patch: { can_access_projects?: boolean; can_access_shifts?: boolean }) {
+    const { error } = await postgres.from("organization_members").update(patch).eq("id", memberId);
+    if (error) return toast.error(error.message);
+    toast.success("Module access updated"); load();
   }
 
   async function revokeInvite(id: string) {
@@ -155,6 +184,7 @@ function TeamPage() {
   }
 
   const roleName = (role: OrgRole, customRoleId: string | null) => customRoles.find((r) => r.id === customRoleId)?.name ?? role;
+  const visibleMembers = canManage ? members : members.filter((member) => member.user_id === signedInUser?.id || member.invited_by === signedInUser?.id);
 
   function copyInviteLink(token: string) {
     const url = `${window.location.origin}/accept-invite/${token}`;
@@ -174,7 +204,7 @@ function TeamPage() {
         <p className="mt-1 text-sm text-muted-foreground">Manage who can access {currentOrg.organization.name}.</p>
       </div>
 
-      {canManage && (
+      {canInvite && (
         <section ref={inviteSectionRef} className="mt-8 rounded-xl border border-border/60 bg-card/40 p-5">
           <h2 className="text-sm font-medium">Invite a teammate</h2>
           <p className="mt-1 text-xs text-muted-foreground">
@@ -187,13 +217,13 @@ function TeamPage() {
             </div>
             <div className="space-y-1.5">
               <Label className="text-xs text-muted-foreground">Role</Label>
-              <Select value={inviteRole} onValueChange={setInviteRole}>
+              <Select value={inviteRole} onValueChange={(value) => { setInviteRole(value); const custom=customRoles.find(r=>`custom:${r.id}`===value); if(custom){setInviteProjects(custom.can_access_projects);setInviteShifts(custom.can_access_shifts);} }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  {ROLES.filter((r) => r !== "owner").map((r) => (
+                  {ROLES.filter((r) => r !== "owner" && (canManage || ["member","viewer"].includes(r))).map((r) => (
                       <SelectItem key={r} value={`base:${r}`} className="capitalize">{r}</SelectItem>
                     ))}
-                  {customRoles.map((r) => <SelectItem key={r.id} value={`custom:${r.id}`}>{r.name}</SelectItem>)}
+                  {canManage && customRoles.map((r) => <SelectItem key={r.id} value={`custom:${r.id}`}>{r.name}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -204,12 +234,13 @@ function TeamPage() {
               </Button>
             </div>
           </form>
+          <div className="mt-3 flex flex-wrap gap-5 border-t border-border/60 pt-3 text-sm"><label className="flex items-center gap-2"><Switch checked={inviteProjects} disabled={!canManage && currentOrg.can_access_projects===false} onCheckedChange={setInviteProjects} /> Projects</label><label className="flex items-center gap-2"><Switch checked={inviteShifts} disabled={!canManage && currentOrg.can_access_shifts===false} onCheckedChange={setInviteShifts} /> Shifts</label><span className="text-xs text-muted-foreground">Choose which modules this person can access.</span></div>
         </section>
       )}
 
       <section className="mt-8">
         <div className="flex items-center justify-between gap-3">
-          <h2 className="text-sm font-medium">Members ({members.length})</h2>
+          <h2 className="text-sm font-medium">Members ({visibleMembers.length})</h2>
           {canManage && <Button type="button" size="sm" variant="outline" className="gap-1.5" onClick={openInviteForm}><UserPlus className="h-4 w-4" /> Invite member</Button>}
         </div>
         <div className="mt-3 overflow-hidden rounded-xl border border-border/60">
@@ -222,11 +253,12 @@ function TeamPage() {
                   <th className="px-4 py-2 text-left font-medium">Name</th>
                   <th className="px-4 py-2 text-left font-medium">Email</th>
                   <th className="px-4 py-2 text-left font-medium">Role</th>
+                  <th className="px-4 py-2 text-left font-medium">Modules</th>
                   <th className="px-4 py-2"></th>
                 </tr>
               </thead>
               <tbody>
-                {members.map((m) => (
+                {visibleMembers.map((m) => (
                   <tr key={m.id} className="border-t border-border/60">
                     <td className="px-4 py-2.5">{m.profile?.full_name ?? "—"}</td>
                     <td className="px-4 py-2.5 text-muted-foreground">{m.profile?.email ?? "—"}</td>
@@ -245,6 +277,7 @@ function TeamPage() {
                         <span className="rounded-full bg-accent px-2.5 py-0.5 text-xs capitalize">{roleName(m.role, m.custom_role_id)}</span>
                       )}
                     </td>
+                    <td className="px-4 py-2.5"><div className="flex gap-3 text-xs"><label className="flex items-center gap-1"><Switch checked={m.can_access_projects} disabled={!canManage || m.role === "owner"} onCheckedChange={(v) => changeModules(m.id,{can_access_projects:v})} /> Projects</label><label className="flex items-center gap-1"><Switch checked={m.can_access_shifts} disabled={!canManage || m.role === "owner"} onCheckedChange={(v) => changeModules(m.id,{can_access_shifts:v})} /> Shifts</label></div></td>
                     <td className="px-4 py-2.5 text-right">
                       {canManage && m.role !== "owner" && (
                         <div className="flex items-center justify-end gap-2">

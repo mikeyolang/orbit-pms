@@ -16,6 +16,7 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShiftRequestTokenRouteImport } from './routes/shift-request.$token'
+import { Route as ApiShiftReportRouteImport } from './routes/api.shift-report'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ApiDataRouteImport } from './routes/api.data'
 import { Route as AcceptInviteTokenRouteImport } from './routes/accept-invite.$token'
@@ -31,10 +32,12 @@ import { Route as ApiAuthSplatRouteImport } from './routes/api.auth.$'
 import { Route as AuthenticatedAppTeamRouteImport } from './routes/_authenticated/app.team'
 import { Route as AuthenticatedAppTasksRouteImport } from './routes/_authenticated/app.tasks'
 import { Route as AuthenticatedAppShiftsRouteImport } from './routes/_authenticated/app.shifts'
+import { Route as AuthenticatedAppShiftReportsRouteImport } from './routes/_authenticated/app.shift-reports'
 import { Route as AuthenticatedAppSettingsRouteImport } from './routes/_authenticated/app.settings'
 import { Route as AuthenticatedAppNotificationsRouteImport } from './routes/_authenticated/app.notifications'
 import { Route as AuthenticatedAppTeamsIndexRouteImport } from './routes/_authenticated/app.teams.index'
 import { Route as AuthenticatedAppProjectsIndexRouteImport } from './routes/_authenticated/app.projects.index'
+import { Route as ApiShiftReportIdPdfRouteImport } from './routes/api.shift-report.$id.pdf'
 import { Route as AuthenticatedAppProjectsKeyRouteImport } from './routes/_authenticated/app.projects.$key'
 
 const VerifyEmailRoute = VerifyEmailRouteImport.update({
@@ -69,6 +72,11 @@ const IndexRoute = IndexRouteImport.update({
 const ShiftRequestTokenRoute = ShiftRequestTokenRouteImport.update({
   id: '/shift-request/$token',
   path: '/shift-request/$token',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiShiftReportRoute = ApiShiftReportRouteImport.update({
+  id: '/api/shift-report',
+  path: '/api/shift-report',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiHealthRoute = ApiHealthRouteImport.update({
@@ -146,6 +154,12 @@ const AuthenticatedAppShiftsRoute = AuthenticatedAppShiftsRouteImport.update({
   path: '/shifts',
   getParentRoute: () => AuthenticatedAppRoute,
 } as any)
+const AuthenticatedAppShiftReportsRoute =
+  AuthenticatedAppShiftReportsRouteImport.update({
+    id: '/shift-reports',
+    path: '/shift-reports',
+    getParentRoute: () => AuthenticatedAppRoute,
+  } as any)
 const AuthenticatedAppSettingsRoute =
   AuthenticatedAppSettingsRouteImport.update({
     id: '/settings',
@@ -170,6 +184,11 @@ const AuthenticatedAppProjectsIndexRoute =
     path: '/projects/',
     getParentRoute: () => AuthenticatedAppRoute,
   } as any)
+const ApiShiftReportIdPdfRoute = ApiShiftReportIdPdfRouteImport.update({
+  id: '/$id/pdf',
+  path: '/$id/pdf',
+  getParentRoute: () => ApiShiftReportRoute,
+} as any)
 const AuthenticatedAppProjectsKeyRoute =
   AuthenticatedAppProjectsKeyRouteImport.update({
     id: '/projects/$key',
@@ -188,9 +207,11 @@ export interface FileRoutesByFullPath {
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/api/data': typeof ApiDataRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/shift-report': typeof ApiShiftReportRouteWithChildren
   '/shift-request/$token': typeof ShiftRequestTokenRoute
   '/app/notifications': typeof AuthenticatedAppNotificationsRoute
   '/app/settings': typeof AuthenticatedAppSettingsRoute
+  '/app/shift-reports': typeof AuthenticatedAppShiftReportsRoute
   '/app/shifts': typeof AuthenticatedAppShiftsRoute
   '/app/tasks': typeof AuthenticatedAppTasksRoute
   '/app/team': typeof AuthenticatedAppTeamRoute
@@ -202,6 +223,7 @@ export interface FileRoutesByFullPath {
   '/api/shift-request/$token': typeof ApiShiftRequestTokenRoute
   '/app/': typeof AuthenticatedAppIndexRoute
   '/app/projects/$key': typeof AuthenticatedAppProjectsKeyRoute
+  '/api/shift-report/$id/pdf': typeof ApiShiftReportIdPdfRoute
   '/app/projects/': typeof AuthenticatedAppProjectsIndexRoute
   '/app/teams/': typeof AuthenticatedAppTeamsIndexRoute
 }
@@ -215,9 +237,11 @@ export interface FileRoutesByTo {
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/api/data': typeof ApiDataRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/shift-report': typeof ApiShiftReportRouteWithChildren
   '/shift-request/$token': typeof ShiftRequestTokenRoute
   '/app/notifications': typeof AuthenticatedAppNotificationsRoute
   '/app/settings': typeof AuthenticatedAppSettingsRoute
+  '/app/shift-reports': typeof AuthenticatedAppShiftReportsRoute
   '/app/shifts': typeof AuthenticatedAppShiftsRoute
   '/app/tasks': typeof AuthenticatedAppTasksRoute
   '/app/team': typeof AuthenticatedAppTeamRoute
@@ -229,6 +253,7 @@ export interface FileRoutesByTo {
   '/api/shift-request/$token': typeof ApiShiftRequestTokenRoute
   '/app': typeof AuthenticatedAppIndexRoute
   '/app/projects/$key': typeof AuthenticatedAppProjectsKeyRoute
+  '/api/shift-report/$id/pdf': typeof ApiShiftReportIdPdfRoute
   '/app/projects': typeof AuthenticatedAppProjectsIndexRoute
   '/app/teams': typeof AuthenticatedAppTeamsIndexRoute
 }
@@ -245,9 +270,11 @@ export interface FileRoutesById {
   '/accept-invite/$token': typeof AcceptInviteTokenRoute
   '/api/data': typeof ApiDataRoute
   '/api/health': typeof ApiHealthRoute
+  '/api/shift-report': typeof ApiShiftReportRouteWithChildren
   '/shift-request/$token': typeof ShiftRequestTokenRoute
   '/_authenticated/app/notifications': typeof AuthenticatedAppNotificationsRoute
   '/_authenticated/app/settings': typeof AuthenticatedAppSettingsRoute
+  '/_authenticated/app/shift-reports': typeof AuthenticatedAppShiftReportsRoute
   '/_authenticated/app/shifts': typeof AuthenticatedAppShiftsRoute
   '/_authenticated/app/tasks': typeof AuthenticatedAppTasksRoute
   '/_authenticated/app/team': typeof AuthenticatedAppTeamRoute
@@ -259,6 +286,7 @@ export interface FileRoutesById {
   '/api/shift-request/$token': typeof ApiShiftRequestTokenRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
   '/_authenticated/app/projects/$key': typeof AuthenticatedAppProjectsKeyRoute
+  '/api/shift-report/$id/pdf': typeof ApiShiftReportIdPdfRoute
   '/_authenticated/app/projects/': typeof AuthenticatedAppProjectsIndexRoute
   '/_authenticated/app/teams/': typeof AuthenticatedAppTeamsIndexRoute
 }
@@ -275,9 +303,11 @@ export interface FileRouteTypes {
     | '/accept-invite/$token'
     | '/api/data'
     | '/api/health'
+    | '/api/shift-report'
     | '/shift-request/$token'
     | '/app/notifications'
     | '/app/settings'
+    | '/app/shift-reports'
     | '/app/shifts'
     | '/app/tasks'
     | '/app/team'
@@ -289,6 +319,7 @@ export interface FileRouteTypes {
     | '/api/shift-request/$token'
     | '/app/'
     | '/app/projects/$key'
+    | '/api/shift-report/$id/pdf'
     | '/app/projects/'
     | '/app/teams/'
   fileRoutesByTo: FileRoutesByTo
@@ -302,9 +333,11 @@ export interface FileRouteTypes {
     | '/accept-invite/$token'
     | '/api/data'
     | '/api/health'
+    | '/api/shift-report'
     | '/shift-request/$token'
     | '/app/notifications'
     | '/app/settings'
+    | '/app/shift-reports'
     | '/app/shifts'
     | '/app/tasks'
     | '/app/team'
@@ -316,6 +349,7 @@ export interface FileRouteTypes {
     | '/api/shift-request/$token'
     | '/app'
     | '/app/projects/$key'
+    | '/api/shift-report/$id/pdf'
     | '/app/projects'
     | '/app/teams'
   id:
@@ -331,9 +365,11 @@ export interface FileRouteTypes {
     | '/accept-invite/$token'
     | '/api/data'
     | '/api/health'
+    | '/api/shift-report'
     | '/shift-request/$token'
     | '/_authenticated/app/notifications'
     | '/_authenticated/app/settings'
+    | '/_authenticated/app/shift-reports'
     | '/_authenticated/app/shifts'
     | '/_authenticated/app/tasks'
     | '/_authenticated/app/team'
@@ -345,6 +381,7 @@ export interface FileRouteTypes {
     | '/api/shift-request/$token'
     | '/_authenticated/app/'
     | '/_authenticated/app/projects/$key'
+    | '/api/shift-report/$id/pdf'
     | '/_authenticated/app/projects/'
     | '/_authenticated/app/teams/'
   fileRoutesById: FileRoutesById
@@ -359,6 +396,7 @@ export interface RootRouteChildren {
   AcceptInviteTokenRoute: typeof AcceptInviteTokenRoute
   ApiDataRoute: typeof ApiDataRoute
   ApiHealthRoute: typeof ApiHealthRoute
+  ApiShiftReportRoute: typeof ApiShiftReportRouteWithChildren
   ShiftRequestTokenRoute: typeof ShiftRequestTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiInvitationTokenRoute: typeof ApiInvitationTokenRoute
@@ -417,6 +455,13 @@ declare module '@tanstack/react-router' {
       path: '/shift-request/$token'
       fullPath: '/shift-request/$token'
       preLoaderRoute: typeof ShiftRequestTokenRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/shift-report': {
+      id: '/api/shift-report'
+      path: '/api/shift-report'
+      fullPath: '/api/shift-report'
+      preLoaderRoute: typeof ApiShiftReportRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/health': {
@@ -524,6 +569,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppShiftsRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/_authenticated/app/shift-reports': {
+      id: '/_authenticated/app/shift-reports'
+      path: '/shift-reports'
+      fullPath: '/app/shift-reports'
+      preLoaderRoute: typeof AuthenticatedAppShiftReportsRouteImport
+      parentRoute: typeof AuthenticatedAppRoute
+    }
     '/_authenticated/app/settings': {
       id: '/_authenticated/app/settings'
       path: '/settings'
@@ -552,6 +604,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedAppProjectsIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
     }
+    '/api/shift-report/$id/pdf': {
+      id: '/api/shift-report/$id/pdf'
+      path: '/$id/pdf'
+      fullPath: '/api/shift-report/$id/pdf'
+      preLoaderRoute: typeof ApiShiftReportIdPdfRouteImport
+      parentRoute: typeof ApiShiftReportRoute
+    }
     '/_authenticated/app/projects/$key': {
       id: '/_authenticated/app/projects/$key'
       path: '/projects/$key'
@@ -565,6 +624,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedAppRouteChildren {
   AuthenticatedAppNotificationsRoute: typeof AuthenticatedAppNotificationsRoute
   AuthenticatedAppSettingsRoute: typeof AuthenticatedAppSettingsRoute
+  AuthenticatedAppShiftReportsRoute: typeof AuthenticatedAppShiftReportsRoute
   AuthenticatedAppShiftsRoute: typeof AuthenticatedAppShiftsRoute
   AuthenticatedAppTasksRoute: typeof AuthenticatedAppTasksRoute
   AuthenticatedAppTeamRoute: typeof AuthenticatedAppTeamRoute
@@ -577,6 +637,7 @@ interface AuthenticatedAppRouteChildren {
 const AuthenticatedAppRouteChildren: AuthenticatedAppRouteChildren = {
   AuthenticatedAppNotificationsRoute: AuthenticatedAppNotificationsRoute,
   AuthenticatedAppSettingsRoute: AuthenticatedAppSettingsRoute,
+  AuthenticatedAppShiftReportsRoute: AuthenticatedAppShiftReportsRoute,
   AuthenticatedAppShiftsRoute: AuthenticatedAppShiftsRoute,
   AuthenticatedAppTasksRoute: AuthenticatedAppTasksRoute,
   AuthenticatedAppTeamRoute: AuthenticatedAppTeamRoute,
@@ -602,6 +663,18 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
 const AuthenticatedRouteRouteWithChildren =
   AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
 
+interface ApiShiftReportRouteChildren {
+  ApiShiftReportIdPdfRoute: typeof ApiShiftReportIdPdfRoute
+}
+
+const ApiShiftReportRouteChildren: ApiShiftReportRouteChildren = {
+  ApiShiftReportIdPdfRoute: ApiShiftReportIdPdfRoute,
+}
+
+const ApiShiftReportRouteWithChildren = ApiShiftReportRoute._addFileChildren(
+  ApiShiftReportRouteChildren,
+)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
@@ -612,6 +685,7 @@ const rootRouteChildren: RootRouteChildren = {
   AcceptInviteTokenRoute: AcceptInviteTokenRoute,
   ApiDataRoute: ApiDataRoute,
   ApiHealthRoute: ApiHealthRoute,
+  ApiShiftReportRoute: ApiShiftReportRouteWithChildren,
   ShiftRequestTokenRoute: ShiftRequestTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiInvitationTokenRoute: ApiInvitationTokenRoute,

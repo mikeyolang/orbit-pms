@@ -21,7 +21,7 @@ export const Route = createFileRoute("/api/invitation/$token")({ server: { handl
       if (!invite || invite.accepted_at || invite.declined_at || invite.revoked_at || new Date(invite.expires_at) < new Date()) throw new Error("This invitation is no longer active");
       if (invite.email.toLowerCase() !== session.user.email.toLowerCase()) throw new Error(`This invitation belongs to ${invite.email}`);
       if (action === "accept") {
-        await client.query("INSERT INTO organization_members (organization_id,user_id,role,custom_role_id) VALUES ($1,$2,$3,$4) ON CONFLICT (organization_id,user_id) DO UPDATE SET role=EXCLUDED.role,custom_role_id=EXCLUDED.custom_role_id", [invite.organization_id, session.user.id, invite.role, invite.custom_role_id]);
+        await client.query("INSERT INTO organization_members (organization_id,user_id,role,custom_role_id,can_access_projects,can_access_shifts,invited_by) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT (organization_id,user_id) DO UPDATE SET role=EXCLUDED.role,custom_role_id=EXCLUDED.custom_role_id,can_access_projects=EXCLUDED.can_access_projects,can_access_shifts=EXCLUDED.can_access_shifts", [invite.organization_id, session.user.id, invite.role, invite.custom_role_id, invite.can_access_projects, invite.can_access_shifts, invite.invited_by]);
         await client.query("UPDATE invitations SET accepted_at=now() WHERE id=$1", [invite.id]);
       } else await client.query("UPDATE invitations SET declined_at=now() WHERE id=$1", [invite.id]);
       await client.query("COMMIT");

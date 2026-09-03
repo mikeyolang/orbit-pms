@@ -15,7 +15,6 @@ import { ShiftCreateDialog } from "@/components/shifts/shift-create-dialog";
 import { EndShiftDialog } from "@/components/shifts/end-shift-dialog";
 import { SwapBoard } from "@/components/shifts/swap-board";
 import { SwapRequestDialog } from "@/components/shifts/swap-request-dialog";
-import { AbsenceCoveragePanel } from "@/components/shifts/absence-coverage-panel";
 import {
   colorForUser, initials, isOnShiftNow, dayShiftAtRange,
   type Shift, type ShiftType, type SwapRequest, type ShiftSettings,
@@ -42,6 +41,7 @@ function ShiftsPage() {
   const [swaps, setSwaps] = useState<(SwapRequest & { from_shift?: ShiftFull | null; from_profile?: { full_name: string | null; email: string | null } | null })[]>([]);
   const [settings, setSettings] = useState<ShiftSettings | null>(null);
   const [loading, setLoading] = useState(true);
+  const [handover, setHandover] = useState<{handover_notes:string;checked_out_at:string;member_name:string}|null>(null);
 
   const [createOpen, setCreateOpen] = useState(false);
   const [createDefaults, setCreateDefaults] = useState<{ userId?: string; date?: Date; shiftTypeId?: string }>({});
@@ -94,6 +94,7 @@ function ShiftsPage() {
   }, [orgId, cursor]);
 
   useEffect(() => { load(); }, [load]);
+  useEffect(()=>{if(currentOrg.can_access_shifts!==false)postgres.rpc("latest_shift_handover",{_org:orgId}).then(({data})=>setHandover(data?.[0]??null))},[orgId,currentOrg.can_access_shifts]);
 
   function openCreate(day?: Date, userId?: string, shiftTypeId?: string) {
     setCreateDefaults({ date: day, userId, shiftTypeId });
@@ -127,6 +128,16 @@ function ShiftsPage() {
     load();
   }
 
+  async function copyRecentPattern(weeks: 1 | 2) {
+    const end = new Date(); end.setHours(23,59,59,999);
+    const start = new Date(end); start.setDate(start.getDate() - weeks * 7 + 1); start.setHours(0,0,0,0);
+    const { data } = await postgres.from("shifts").select("*").eq("organization_id",orgId).gte("start_at",start.toISOString()).lte("start_at",end.toISOString());
+    if (!data?.length) return toast.info(`No shifts found in the last ${weeks} week${weeks>1?"s":""}`);
+    const { data:u }=await postgres.auth.getUser(); const offset=weeks*7*86_400_000;
+    const rows=(data as ShiftFull[]).map(s=>({organization_id:orgId,user_id:s.user_id,shift_type_id:s.shift_type_id,start_at:new Date(new Date(s.start_at).getTime()+offset).toISOString(),end_at:new Date(new Date(s.end_at).getTime()+offset).toISOString(),notes:s.notes,created_by:u.user?.id??null}));
+    const {error}=await postgres.from("shifts").insert(rows);if(error)return toast.error(error.message);toast.success(`Copied ${weeks}-week pattern forward`);load();
+  }
+
   const myUpcoming = useMemo(() => shifts
     .filter((s) => s.user_id === user?.id && new Date(s.end_at).getTime() > Date.now() && s.status !== "ended" && s.status !== "cancelled")
     .sort((a, b) => new Date(a.start_at).getTime() - new Date(b.start_at).getTime()), [shifts, user?.id]);
@@ -141,6 +152,12 @@ function ShiftsPage() {
   );
   const activeNow = myUpcoming.find((s) => isOnShiftNow(s));
 
+  async function checkIn(shift: ShiftFull) {
+    const { error } = await postgres.from("shifts").update({ status: "in_progress", started_at: new Date().toISOString() }).eq("id", shift.id);
+    if (error) return toast.error(error.message);
+    toast.success("Checked in successfully"); load();
+  }
+
   return (
     <div className="mx-auto max-w-7xl px-6 py-6 space-y-4">
       <div className="flex items-end justify-between">
@@ -149,6 +166,8 @@ function ShiftsPage() {
           <p className="mt-1 text-sm text-muted-foreground">Rota, coverage, and swap requests for {currentOrg.organization.name}.</p>
         </div>
         <div className="flex items-center gap-2">
+          {canManage && <Button size="sm" variant="outline" onClick={()=>copyRecentPattern(1)}>Copy 1-week pattern</Button>}
+          {canManage && <Button size="sm" variant="outline" onClick={()=>copyRecentPattern(2)}>Copy 2-week pattern</Button>}
           {canManage && (
             <Button size="sm" variant="outline" onClick={copyPreviousMonth}>
               <Copy className="h-4 w-4" /> Copy previous month
@@ -180,14 +199,11 @@ function ShiftsPage() {
             <Button size="sm" variant="outline" onClick={() => setSwapTarget(activeNow)}>
               <MessageSquareQuote className="h-4 w-4" /> Request swap
             </Button>
-            <Button size="sm" onClick={() => setEndTarget(activeNow.id)}>
-              <StopCircle className="h-4 w-4" /> End shift
-            </Button>
+            {activeNow.started_at ? <Button size="sm" onClick={() => setEndTarget(activeNow.id)}><StopCircle className="h-4 w-4" /> Check out</Button> : <Button size="sm" onClick={() => checkIn(activeNow)}><Play className="h-4 w-4" /> Check in</Button>}
           </div>
         </div>
       )}
-
-      {user && <AbsenceCoveragePanel orgId={orgId} userId={user.id} canManage={canManage} shifts={shifts} members={members} onChanged={load} />}
+      {activeNow && handover && <div className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-3"><div className="text-xs font-medium uppercase tracking-wide text-amber-600">Handover from {handover.member_name}</div><p className="mt-1 text-sm">{handover.handover_notes}</p><div className="mt-1 text-xs text-muted-foreground">Submitted {format(new Date(handover.checked_out_at),"MMM d, HH:mm")}</div></div>}
 
       <SwapBoard requests={swaps} currentUserId={user?.id ?? ""} isManager={canManage} members={members} onChange={load} />
 
@@ -207,7 +223,6 @@ function ShiftsPage() {
           onReload={load}
         />
       )}
-
       <ShiftCreateDialog
         open={createOpen}
         onOpenChange={setCreateOpen}
@@ -219,7 +234,7 @@ function ShiftsPage() {
       />
 
       {endTarget && (
-        <EndShiftDialog open={!!endTarget} onOpenChange={(v) => !v && setEndTarget(null)} shiftId={endTarget} onEnded={load} />
+        <EndShiftDialog open={!!endTarget} onOpenChange={(v) => !v && setEndTarget(null)} shiftId={endTarget} orgId={orgId} onEnded={load} />
       )}
 
       {swapTarget && user && (

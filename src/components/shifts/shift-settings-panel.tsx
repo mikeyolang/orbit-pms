@@ -12,16 +12,20 @@ export function ShiftSettingsPanel({ orgId, canManage }: { orgId: string; canMan
   type ExtendedSettings = ShiftSettings & { hr_integration_enabled?: boolean; hr_system_name?: string | null; hr_webhook_url?: string | null };
   const [settings, setSettings] = useState<ExtendedSettings | null>(null);
   const [types, setTypes] = useState<ShiftType[]>([]);
+  const [companies, setCompanies] = useState<{id:string;name:string}[]>([]);
+  const [companyName, setCompanyName] = useState("");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     setLoading(true);
-    const [{ data: s }, { data: t }] = await Promise.all([
+    const [{ data: s }, { data: t }, { data: c }] = await Promise.all([
       postgres.from("shift_settings").select("*").eq("organization_id", orgId).maybeSingle(),
       postgres.from("shift_types").select("*").eq("organization_id", orgId).order("sort_order"),
+      postgres.from("bus_companies").select("id,name").eq("organization_id",orgId).eq("is_active",true).order("name"),
     ]);
     setSettings(s as ExtendedSettings | null);
     setTypes(t ?? []);
+    setCompanies(c ?? []);
     setLoading(false);
   }, [orgId]);
 
@@ -57,12 +61,21 @@ export function ShiftSettingsPanel({ orgId, canManage }: { orgId: string; canMan
     setTypes((prev) => prev.filter((t) => t.id !== id));
   }
 
+  async function addCompany() { const name=companyName.trim();if(!name)return;const {data,error}=await postgres.from("bus_companies").insert({organization_id:orgId,name}).single();if(error)return toast.error(error.message);setCompanies(old=>[...old,data].sort((a,b)=>a.name.localeCompare(b.name)));setCompanyName(""); }
+  async function removeCompany(id:string){if(!confirm("Remove this bus company from future checkout forms?"))return;const {error}=await postgres.from("bus_companies").update({is_active:false}).eq("id",id);if(error)return toast.error(error.message);setCompanies(old=>old.filter(c=>c.id!==id));}
+
   if (loading) {
     return <div className="flex justify-center py-8"><Loader2 className="h-4 w-4 animate-spin text-muted-foreground" /></div>;
   }
 
   return (
     <div className="space-y-6">
+      <section className="rounded-xl border border-border bg-card p-5">
+        <div className="flex items-center justify-between"><div><h3 className="text-sm font-semibold">Bus companies</h3><p className="text-xs text-muted-foreground">Companies shown during shift checkout.</p></div><span className="text-xs text-muted-foreground">{companies.length} active</span></div>
+        {canManage&&<div className="mt-3 flex gap-2"><Input value={companyName} onChange={e=>setCompanyName(e.target.value)} onKeyDown={e=>{if(e.key==="Enter"){e.preventDefault();void addCompany()}}} placeholder="Add bus company"/><Button variant="outline" onClick={addCompany}><Plus className="h-4 w-4"/>Add</Button></div>}
+        <div className="mt-3 max-h-64 divide-y overflow-y-auto rounded-lg border">{companies.map(c=><div key={c.id} className="flex items-center px-3 py-2 text-sm"><span className="flex-1">{c.name}</span>{canManage&&<Button size="icon" variant="ghost" onClick={()=>removeCompany(c.id)}><Trash2 className="h-4 w-4"/></Button>}</div>)}</div>
+      </section>
+
       <section className="rounded-xl border border-border bg-card p-5">
         <h3 className="text-sm font-semibold">General</h3>
         <div className="mt-4 space-y-3">

@@ -9,6 +9,8 @@ export interface OrgMembership {
   role: OrgRole;
   organization: { id: string; name: string; slug: string; invite_code?: string | null };
   is_support_only?: boolean;
+  can_access_projects?: boolean;
+  can_access_shifts?: boolean;
 }
 
 export type AppUser = {

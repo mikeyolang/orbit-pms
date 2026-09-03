@@ -123,6 +123,8 @@ export const organizationMembers = pgTable(
       .references(() => user.id, { onDelete: "cascade" }),
     role: orgRole("role").default("member").notNull(),
     isSupportOnly: boolean("is_support_only").default(false).notNull(),
+    canAccessProjects: boolean("can_access_projects").default(true).notNull(),
+    canAccessShifts: boolean("can_access_shifts").default(true).notNull(),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [

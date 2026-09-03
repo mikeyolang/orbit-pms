@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
-import { Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 
 const searchSchema = z.object({
   mode: z.enum(["signin", "signup"]).optional(),
@@ -28,6 +28,7 @@ function AuthPage() {
   const [fullName, setFullName] = useState("");
   const [email, setEmail] = useState(prefillEmail ?? "");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   // Already signed in? Keep the session and go straight into the app.
   useEffect(() => {
@@ -47,8 +48,13 @@ function AuthPage() {
         fullName: z.string().trim().min(1, "Name is required").max(80),
         email: z.string().trim().email("Invalid email").max(255),
         password: z.string().min(8, "Password must be at least 8 characters").max(72),
+        confirmPassword: z.string().min(1, "Please confirm your password"),
       })
-      .safeParse({ fullName, email, password });
+      .refine((values) => values.password === values.confirmPassword, {
+        message: "Passwords do not match",
+        path: ["confirmPassword"],
+      })
+      .safeParse({ fullName, email, password, confirmPassword });
     if (!parsed.success) {
       toast.error(parsed.error.issues[0].message);
       return;
@@ -117,6 +123,7 @@ function AuthPage() {
         <form onSubmit={handleSignup} className="space-y-4">
           <Field label="Full name">
             <Input
+              className="h-11 bg-white dark:bg-slate-950"
               value={fullName}
               onChange={(e) => setFullName(e.target.value)}
               autoComplete="name"
@@ -125,6 +132,7 @@ function AuthPage() {
           </Field>
           <Field label="Email">
             <Input
+              className="h-11 bg-white dark:bg-slate-950"
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
@@ -133,8 +141,7 @@ function AuthPage() {
             />
           </Field>
           <Field label="Password">
-            <Input
-              type="password"
+            <PasswordInput
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               autoComplete="new-password"
@@ -142,7 +149,16 @@ function AuthPage() {
               minLength={8}
             />
           </Field>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Field label="Confirm password">
+            <PasswordInput
+              value={confirmPassword}
+              onChange={(e) => setConfirmPassword(e.target.value)}
+              autoComplete="new-password"
+              required
+              minLength={8}
+            />
+          </Field>
+          <Button type="submit" className="w-full bg-gradient-to-r from-violet-600 to-blue-600 text-white hover:from-violet-700 hover:to-blue-700" disabled={loading}>
             {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
             Create account
           </Button>
@@ -170,6 +186,7 @@ function AuthPage() {
       <form onSubmit={handleSignin} className="space-y-4">
         <Field label="Email">
           <Input
+            className="h-11 bg-white dark:bg-slate-950"
             type="email"
             value={email}
             onChange={(e) => setEmail(e.target.value)}
@@ -188,20 +205,37 @@ function AuthPage() {
             </Link>
           }
         >
-          <Input
-            type="password"
+          <PasswordInput
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoComplete="current-password"
             required
           />
         </Field>
-        <Button type="submit" className="w-full" disabled={loading}>
+        <Button type="submit" className="w-full bg-gradient-to-r from-violet-600 to-blue-600 text-white hover:from-violet-700 hover:to-blue-700" disabled={loading}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Sign in
         </Button>
       </form>
     </AuthShell>
+  );
+}
+
+function PasswordInput(props: React.ComponentProps<typeof Input>) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div className="relative">
+      <Input {...props} type={visible ? "text" : "password"} className="h-11 bg-white pr-11 dark:bg-slate-950" />
+      <button
+        type="button"
+        onClick={() => setVisible((current) => !current)}
+        className="absolute inset-y-0 right-0 grid w-11 place-items-center text-muted-foreground transition-colors hover:text-foreground"
+        aria-label={visible ? "Hide password" : "Show password"}
+        title={visible ? "Hide password" : "Show password"}
+      >
+        {visible ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+      </button>
+    </div>
   );
 }
 

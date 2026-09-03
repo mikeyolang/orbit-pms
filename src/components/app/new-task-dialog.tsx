@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { toast } from "sonner";
 import { Loader2, Plus } from "lucide-react";
 import { TASK_PRIORITIES, TASK_STATUSES, type Milestone, type Sprint } from "@/lib/projects";
+import { MemberCombobox } from "@/components/app/member-combobox";
 
 interface Member { user_id: string; full_name: string | null; email: string | null }
 
@@ -52,7 +53,7 @@ export function NewTaskDialog({
       const { data: project } = await postgres.from("projects").select("organization_id").eq("id", projectId).single();
       if (!project) return;
       const [{ data: mems }, { data: sp }, { data: ms }] = await Promise.all([
-        postgres.from("organization_members").select("user_id").eq("organization_id", project.organization_id),
+        postgres.from("organization_members").select("user_id").eq("organization_id", project.organization_id).eq("can_access_projects", true),
         postgres.from("sprints").select("*").eq("project_id", projectId).neq("status", "completed").order("start_date"),
         postgres.from("milestones").select("*").eq("project_id", projectId).neq("status", "completed").order("due_date"),
       ]);
@@ -130,13 +131,7 @@ export function NewTaskDialog({
               </Select>
             </F>
             <F label="Assignee">
-              <Select value={assigneeId} onValueChange={setAssigneeId}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Unassigned</SelectItem>
-                  {members.map((m) => <SelectItem key={m.user_id} value={m.user_id}>{m.full_name ?? m.email ?? "Unknown"}</SelectItem>)}
-                </SelectContent>
-              </Select>
+              <MemberCombobox members={members} value={assigneeId} onChange={setAssigneeId} />
             </F>
             <F label="Due date">
               <Input type="date" value={dueDate} onChange={(e) => setDueDate(e.target.value)} />
@@ -282,4 +277,3 @@ function MilestoneSelect({
     </Select>
   );
 }
-

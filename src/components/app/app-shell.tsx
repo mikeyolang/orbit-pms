@@ -12,6 +12,7 @@ import {
   ChevronDown,
   LogOut,
   Plus,
+  FileText,
 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -33,6 +34,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
+import { useMyPermissions } from "@/lib/permissions";
 
 export function AppShell({ children }: { children: ReactNode }) {
   const navigate = useNavigate();
@@ -41,6 +43,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [currentOrg, setCurrentOrg] = useState<OrgMembership | null>(null);
   const [isSupportOnly, setIsSupportOnly] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { can: canCurrent } = useMyPermissions(currentOrg?.organization_id);
 
   useEffect(() => {
     if (memLoading || memberships.length === 0) return;
@@ -78,23 +81,32 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const fullNav = [
     { to: "/app", label: "Dashboard", icon: LayoutDashboard, exact: true },
-    { to: "/app/shifts", label: "Shifts", icon: CalendarClock, exact: false },
     { to: "/app/projects", label: "Projects", icon: FolderKanban, exact: false },
+    { to: "/app/shifts", label: "Shifts", icon: CalendarClock, exact: false },
+    { to: "/app/shift-reports", label: "Shift Reports", icon: FileText, exact: false },
     { to: "/app/tasks", label: "My Tasks", icon: CheckSquare, exact: false },
     { to: "/app/teams", label: "Teams", icon: Users2, exact: false },
     { to: "/app/notifications", label: "Inbox", icon: Bell, exact: false },
-    ...(canManage ? [{ to: "/app/team", label: "People & Roles", icon: Users, exact: false }] : []),
+    ...(canManage || canCurrent("members.invite") ? [{ to: "/app/team", label: "People & Roles", icon: Users, exact: false }] : []),
     { to: "/app/settings", label: "Settings", icon: Settings, exact: false },
   ];
   const supportNav = fullNav.filter((n) =>
-    ["/app", "/app/shifts", "/app/tasks", "/app/settings"].includes(n.to),
+    ["/app", "/app/shifts", "/app/shift-reports", "/app/tasks", "/app/settings"].includes(n.to),
   );
-  const nav = isSupportOnly ? supportNav : fullNav;
+  const nav = (isSupportOnly ? supportNav : fullNav).filter((item) => {
+    if (role === "owner" || role === "admin") return true;
+    if (["/app/projects", "/app/tasks", "/app/teams"].includes(item.to)) return currentOrg.can_access_projects !== false;
+    if (["/app/shifts", "/app/shift-reports"].includes(item.to)) return currentOrg.can_access_shifts !== false;
+    return true;
+  });
 
   // Route guard for support-only users
-  const allowed = nav.some((n) => (n.exact ? pathname === n.to : pathname.startsWith(n.to)));
-  if (isSupportOnly && !allowed && !pathname.startsWith("/onboarding")) {
-    navigate({ to: "/app/shifts", replace: true });
+  const matchesNavItem = (item: (typeof nav)[number]) =>
+    item.exact ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`);
+
+  const allowed = nav.some(matchesNavItem);
+  if (!allowed && !pathname.startsWith("/onboarding")) {
+    navigate({ to: currentOrg.can_access_shifts !== false ? "/app/shifts" : "/app", replace: true });
   }
 
   async function signOut() {
@@ -104,19 +116,19 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      <aside className="hidden w-64 flex-col border-r border-sidebar-border bg-sidebar text-sidebar-foreground md:flex">
-        <div className="border-b border-sidebar-border p-3">
+      <aside className="hidden w-64 flex-col border-r border-indigo-400/20 bg-gradient-to-b from-indigo-950 via-slate-950 to-slate-900 text-white shadow-xl md:flex">
+        <div className="border-b border-white/10 p-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-2 rounded-md p-2 text-left hover:bg-sidebar-accent">
-                <div className="grid h-7 w-7 place-items-center rounded-md bg-gradient-to-br from-primary to-primary/60 text-xs font-semibold text-primary-foreground">
+              <button className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-white/10">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet-500 to-blue-500 text-xs font-bold text-white shadow-lg shadow-indigo-950/40">
                   {currentOrg.organization.name[0]?.toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm font-medium">{currentOrg.organization.name}</div>
-                  <div className="truncate text-xs text-muted-foreground capitalize">{role}</div>
+                  <div className="truncate text-sm font-semibold text-white">{currentOrg.organization.name}</div>
+                  <div className="truncate text-xs capitalize text-indigo-200/75">{role}</div>
                 </div>
-                <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                <ChevronDown className="h-4 w-4 text-indigo-200/75" />
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent className="w-60" align="start">
@@ -147,44 +159,46 @@ export function AppShell({ children }: { children: ReactNode }) {
           </DropdownMenu>
         </div>
 
-        <nav className="flex-1 space-y-0.5 p-2">
+        <nav className="flex-1 space-y-1 p-3">
           {nav.map((item) => {
-            const active = item.exact ? pathname === item.to : pathname.startsWith(item.to);
+            const active = matchesNavItem(item);
             return (
               <Link
                 key={item.to}
                 to={item.to as never}
-                className={`flex items-center gap-2 rounded-md px-2.5 py-1.5 text-sm transition-colors ${
+                className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
                   active
-                    ? "bg-sidebar-accent text-sidebar-accent-foreground"
-                    : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-foreground"
+                    ? "bg-gradient-to-r from-violet-600 to-blue-600 text-white shadow-md shadow-indigo-950/30"
+                    : "text-indigo-100/75 hover:bg-white/10 hover:text-white"
                 }`}
               >
-                <item.icon className="h-4 w-4" />
+                <span className={`grid h-7 w-7 place-items-center rounded-md ${active ? "bg-white/15" : "bg-white/5 group-hover:bg-white/10"}`}>
+                  <item.icon className="h-4 w-4" />
+                </span>
                 {item.label}
               </Link>
             );
           })}
         </nav>
 
-        <div className="border-t border-sidebar-border p-2">
+        <div className="border-t border-white/10 p-3">
           <div className="mb-1 flex items-center justify-between px-1">
-            <span className="text-[10px] uppercase tracking-wider text-muted-foreground">
+            <span className="text-[10px] uppercase tracking-wider text-indigo-200/60">
               Preferences
             </span>
             <ThemeToggle />
           </div>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <button className="flex w-full items-center gap-2 rounded-md p-2 text-left hover:bg-sidebar-accent">
-                <div className="grid h-7 w-7 place-items-center rounded-full bg-accent text-xs font-medium">
+              <button className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-white/10">
+                <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 text-xs font-bold text-white">
                   {user?.email?.[0]?.toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm">
+                  <div className="truncate text-sm font-medium text-white">
                     {user?.user_metadata?.full_name ?? user?.email}
                   </div>
-                  <div className="truncate text-xs text-muted-foreground">{user?.email}</div>
+                  <div className="truncate text-xs text-indigo-200/65">{user?.email}</div>
                 </div>
               </button>
             </DropdownMenuTrigger>

@@ -14,6 +14,7 @@ import {
 } from "@/lib/projects";
 import { NewTaskDialog } from "./new-task-dialog";
 import { TaskCommentsActivity } from "./task-comments";
+import { MemberCombobox } from "./member-combobox";
 
 interface Member { user_id: string; full_name: string | null; email: string | null }
 
@@ -43,7 +44,7 @@ export function TaskDetailSheet({
       const { data: project } = await postgres.from("projects").select("organization_id").eq("id", t.project_id).single();
       if (!project) return;
       const [{ data: mems }, { data: lbs }, { data: tlabels }, { data: subs }, { data: ds }, { data: all }] = await Promise.all([
-        postgres.from("organization_members").select("user_id").eq("organization_id", project.organization_id),
+        postgres.from("organization_members").select("user_id").eq("organization_id", project.organization_id).eq("can_access_projects", true),
         postgres.from("labels").select("*").eq("organization_id", project.organization_id).order("name"),
         postgres.from("task_labels").select("label_id").eq("task_id", t.id),
         postgres.from("tasks").select("*").eq("parent_task_id", t.id).order("number"),
@@ -155,9 +156,7 @@ export function TaskDetailSheet({
               options={TASK_STATUSES.map((s) => ({ value: s.value, label: s.label }))} />
             <Sel label="Priority" value={t.priority} onChange={(v) => patch({ priority: v as never })}
               options={TASK_PRIORITIES.map((p) => ({ value: p.value, label: p.label }))} />
-            <Sel label="Assignee" value={t.assignee_id ?? "none"}
-              onChange={(v) => patch({ assignee_id: v === "none" ? null : v })}
-              options={[{ value: "none", label: "Unassigned" }, ...members.map((m) => ({ value: m.user_id, label: m.full_name ?? m.email ?? "Unknown" }))]} />
+            <FieldL label="Assignee"><MemberCombobox members={members} value={t.assignee_id ?? "none"} onChange={(v) => patch({ assignee_id: v === "none" ? null : v })} /></FieldL>
             <FieldL label="Due date">
               <Input type="date" value={t.due_date ? t.due_date.slice(0, 10) : ""}
                 onChange={(e) => patch({ due_date: e.target.value ? new Date(e.target.value).toISOString() : null })} />

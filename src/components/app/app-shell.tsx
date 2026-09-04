@@ -17,10 +17,12 @@ import {
 
 import { ThemeToggle } from "@/components/theme-toggle";
 import { authClient } from "@/lib/auth-client";
+import { postgres } from "@/integrations/postgres/client";
 import {
   useAuthSession,
   useMemberships,
   getCurrentOrgId,
+  membershipRoleLabel,
   setCurrentOrgId,
   type OrgMembership,
 } from "@/lib/auth";
@@ -42,6 +44,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const { memberships, loading: memLoading, refresh } = useMemberships(user);
   const [currentOrg, setCurrentOrg] = useState<OrgMembership | null>(null);
   const [isSupportOnly, setIsSupportOnly] = useState(false);
+  const [unreadNotifications, setUnreadNotifications] = useState(0);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { can: canCurrent } = useMyPermissions(currentOrg?.organization_id);
 
@@ -63,6 +66,18 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [refreshSupport]);
 
   useEffect(() => {
+    if (!user) return;
+    let active = true;
+    const loadUnread = async () => {
+      const { data } = await postgres.from("system_notifications").select("id").eq("user_id", user.id).is("read_at", null);
+      if (active) setUnreadNotifications((data ?? []).length);
+    };
+    void loadUnread();
+    const timer = window.setInterval(loadUnread, 8000);
+    return () => { active = false; window.clearInterval(timer); };
+  }, [user, pathname]);
+
+  useEffect(() => {
     if (!sessionLoading && !memLoading && memberships.length === 0) {
       navigate({ to: "/onboarding" });
     }
@@ -77,6 +92,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   }
 
   const role = currentOrg.role;
+  const roleLabel = membershipRoleLabel(currentOrg);
   const canManage = role === "owner" || role === "admin";
 
   const fullNav = [
@@ -116,17 +132,17 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
-      <aside className="hidden w-64 flex-col border-r border-indigo-400/20 bg-gradient-to-b from-indigo-950 via-slate-950 to-slate-900 text-white shadow-xl md:flex">
+      <aside className="hidden w-64 flex-col border-r border-white/10 bg-gradient-to-b from-[#1B3673] via-[#142A5C] to-slate-950 text-white shadow-xl md:flex">
         <div className="border-b border-white/10 p-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-white/10">
-                <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet-500 to-blue-500 text-xs font-bold text-white shadow-lg shadow-indigo-950/40">
+                <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#1B3673] text-xs font-bold text-white shadow-lg shadow-slate-950/40">
                   {currentOrg.organization.name[0]?.toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold text-white">{currentOrg.organization.name}</div>
-                  <div className="truncate text-xs capitalize text-indigo-200/75">{role}</div>
+                  <div className="truncate text-xs text-indigo-200/75">{roleLabel}</div>
                 </div>
                 <ChevronDown className="h-4 w-4 text-indigo-200/75" />
               </button>
@@ -145,7 +161,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <div className="grid h-5 w-5 place-items-center rounded bg-gradient-to-br from-primary to-primary/60 text-[10px] font-semibold text-primary-foreground">
                     {m.organization.name[0]?.toUpperCase()}
                   </div>
-                  <span className="truncate">{m.organization.name}</span>
+                  <div className="min-w-0 flex-1">
+                    <div className="truncate">{m.organization.name}</div>
+                    <div className="truncate text-xs text-muted-foreground">{membershipRoleLabel(m)}</div>
+                  </div>
                 </DropdownMenuItem>
               ))}
               <DropdownMenuSeparator />
@@ -166,16 +185,21 @@ export function AppShell({ children }: { children: ReactNode }) {
               <Link
                 key={item.to}
                 to={item.to as never}
-                className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all ${
+                className={`group flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-semibold transition-all ${
                   active
-                    ? "bg-gradient-to-r from-violet-600 to-blue-600 text-white shadow-md shadow-indigo-950/30"
-                    : "text-indigo-100/75 hover:bg-white/10 hover:text-white"
+                    ? "bg-red-600 text-white"
+                    : "text-white hover:bg-white/10"
                 }`}
               >
-                <span className={`grid h-7 w-7 place-items-center rounded-md ${active ? "bg-white/15" : "bg-white/5 group-hover:bg-white/10"}`}>
+                <span className={`grid h-7 w-7 place-items-center rounded-md ${active ? "bg-red-700" : "bg-white/5 group-hover:bg-white/10"}`}>
                   <item.icon className="h-4 w-4" />
                 </span>
-                {item.label}
+                <span className="flex-1">{item.label}</span>
+                {item.to === "/app/notifications" && unreadNotifications > 0 && (
+                  <span className="min-w-5 rounded-full bg-red-500 px-1.5 py-0.5 text-center text-[10px] font-bold leading-none text-white">
+                    {unreadNotifications > 99 ? "99+" : unreadNotifications}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -191,7 +215,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button className="flex w-full items-center gap-2 rounded-lg p-2 text-left transition-colors hover:bg-white/10">
-                <div className="grid h-8 w-8 place-items-center rounded-full bg-gradient-to-br from-cyan-400 to-blue-500 text-xs font-bold text-white">
+                <div className="grid h-8 w-8 place-items-center rounded-full bg-[#1B3673] text-xs font-bold text-white">
                   {user?.email?.[0]?.toUpperCase()}
                 </div>
                 <div className="min-w-0 flex-1">

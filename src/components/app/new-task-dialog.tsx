@@ -140,7 +140,11 @@ export function NewTaskDialog({
               <SprintSelect
                 projectId={projectId}
                 value={sprintId}
-                onChange={setSprintId}
+                onChange={(value) => {
+                  setSprintId(value);
+                  const linkedMilestone = sprints.find((sprint) => sprint.id === value)?.milestone_id;
+                  if (linkedMilestone) setMilestoneId(linkedMilestone);
+                }}
                 sprints={sprints}
                 onCreated={(s) => { setSprints((prev) => [...prev, s]); setSprintId(s.id); }}
               />

@@ -18,14 +18,25 @@ The container publishes PostgreSQL on `127.0.0.1:5433` to avoid colliding with a
 
 ## Environment modes
 
+### Local demo login
+
+`npm run db:seed` creates the following verified development account:
+
+| Field | Value |
+| --- | --- |
+| Email | `demo@orbit.local` |
+| Password | `OrbitDemo123!` |
+| Workspace | `Orbit Demo Workspace` |
+| Role | `Owner` |
+
+Override the account with `SEED_USER_EMAIL`, `SEED_USER_NAME`, and `SEED_USER_PASSWORD` in `.env` before seeding. This account is strictly for local development and must never be seeded into staging or production.
+
 - `MAIL_MODE=smtp`: sends only to local Mailpit (the recommended local default).
 - `MAIL_MODE=log`: logs recipient and subject metadata without sending.
 - `MAIL_MODE=test`: calls Mailgun with test mode enabled; no delivery occurs.
 - `MAIL_MODE=send`: sends through Mailgun.
 
 Database and Mailgun credentials are server-only and must never use a `VITE_` prefix.
-The default local seed login is `demo@orbit.local` / `OrbitDemo123!`. Override it with the `SEED_USER_*` variables and never use these development credentials in staging or production.
-
 ## Cutover sequence
 
 1. Export and verify the current Supabase schema and data.

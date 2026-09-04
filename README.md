@@ -52,7 +52,17 @@ Orbit PMS is a TanStack Start application backed by PostgreSQL. The local stack 
 
 Open <http://localhost:8080>. The database health check is available at <http://localhost:8080/api/health>, and captured development email can be viewed in Mailpit at <http://localhost:8025>.
 
-The default seeded login is `demo@orbit.local` / `OrbitDemo123!`. Change the `SEED_USER_*` values before seeding if you want different local credentials. Do not use these demo credentials in production.
+### Demo login
+
+Running `npm run db:seed` creates one verified local demo account and makes it the owner of **Orbit Demo Workspace**:
+
+| Field | Value |
+| --- | --- |
+| Email | `demo@orbit.local` |
+| Password | `OrbitDemo123!` |
+| Workspace role | `Owner` |
+
+These credentials are for local development only. To use a different demo account, edit `SEED_USER_EMAIL`, `SEED_USER_NAME`, and `SEED_USER_PASSWORD` in `.env` before running the seed command. Running the seed command again updates the configured demo user's password.
 
 To stop the local services, run:
 
@@ -134,5 +144,6 @@ In Cloudflare, attach the production custom domain to the deployed Worker. If a 
 - Register `https://YOUR_DOMAIN/api/mailgun/webhook` in Mailgun when email delivery is enabled.
 - Schedule authenticated `POST` requests to `/api/mail/process` every minute and `/api/notifications/process` daily, using `Authorization: Bearer YOUR_CRON_SECRET`.
 - Keep production secrets out of Git, `.env.example`, build logs, and all `VITE_` variables.
+- Never seed the documented local demo account into staging or production.
 
 For the detailed database cutover and email-delivery procedures, see [docs/database-migration.md](docs/database-migration.md) and [docs/email-notification-testing.md](docs/email-notification-testing.md).

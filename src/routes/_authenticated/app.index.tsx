@@ -870,8 +870,17 @@ function buildAnalytics(data: DashboardData) {
     .sort((a, b) => (a.due_date ?? "9999-12-31").localeCompare(b.due_date ?? "9999-12-31"))
     .slice(0, 6)
     .map((milestone) => {
-      const milestoneTasks = actionableTasks.filter((task) => task.milestone_id === milestone.id);
+      const linkedSprints = data.sprints.filter((sprint) => sprint.milestone_id === milestone.id);
+      const linkedSprintIds = new Set(linkedSprints.map((sprint) => sprint.id));
+      const milestoneTasks = actionableTasks.filter((task) => task.milestone_id === milestone.id || (task.sprint_id && linkedSprintIds.has(task.sprint_id)));
       const milestoneDone = milestoneTasks.filter((task) => task.status === "done");
+      const sprintProgress = linkedSprints.map((sprint) => {
+        if (sprint.status === "completed") return 100;
+        const tasks = actionableTasks.filter((task) => task.sprint_id === sprint.id);
+        return percentage(tasks.filter((task) => task.status === "done").length, tasks.length);
+      });
+      const directTasks = actionableTasks.filter((task) => task.milestone_id === milestone.id && (!task.sprint_id || !linkedSprintIds.has(task.sprint_id)));
+      const progressUnits = [...sprintProgress, ...directTasks.map((task) => task.status === "done" ? 100 : 0)];
       const overdue = Boolean(milestone.due_date && new Date(milestone.due_date) < today && milestone.status !== "completed");
       return {
         id: milestone.id,
@@ -880,7 +889,7 @@ function buildAnalytics(data: DashboardData) {
         projectName: projectNameById.get(milestone.project_id) ?? "Project",
         dueLabel: milestone.due_date ? `Due ${formatDate(milestone.due_date)}` : "No due date",
         overdue,
-        progress: milestone.status === "completed" ? 100 : percentage(milestoneDone.length, milestoneTasks.length),
+        progress: milestone.status === "completed" ? 100 : progressUnits.length ? Math.round(progressUnits.reduce((sum, value) => sum + value, 0) / progressUnits.length) : percentage(milestoneDone.length, milestoneTasks.length),
       };
     });
 

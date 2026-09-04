@@ -33,7 +33,8 @@ import {
   Plus,
   UserCog,
 } from "lucide-react";
-import { setCurrentOrgId, type OrgMembership } from "@/lib/auth";
+import { membershipRoleLabel, setCurrentOrgId, type OrgMembership } from "@/lib/auth";
+import { getMyMemberships } from "@/lib/api/session.functions";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
   validateSearch: z.object({
@@ -79,9 +80,7 @@ function WorkspaceHome() {
   const load = useCallback(async () => {
     const { data: u } = await postgres.auth.getUser();
     const [m, inv, jr, prof] = await Promise.all([
-      postgres
-        .from("organization_members")
-        .select("organization_id, role, organization:organizations(id, name, slug, invite_code)"),
+      getMyMemberships().then((data) => ({ data })),
       postgres.rpc("my_pending_invites"),
       postgres.rpc("my_join_requests"),
       u.user ? postgres.from("profiles").select("id, full_name, email").eq("id", u.user.id).maybeSingle() : null,
@@ -237,7 +236,7 @@ function WorkspaceHome() {
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate text-sm font-medium">{m.organization.name}</div>
-                    <div className="truncate text-xs capitalize text-muted-foreground">{m.role}</div>
+                    <div className="truncate text-xs text-muted-foreground">Your role: {membershipRoleLabel(m)}</div>
                   </div>
                   <ArrowRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:translate-x-0.5" />
                 </button>

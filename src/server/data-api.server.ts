@@ -2,6 +2,7 @@ import { getAuth } from "./auth.server";
 import { getPool } from "./db/client.server";
 import { getServerConfig } from "@/lib/config.server";
 import { escapeEmailHtml, sendTransactionalEmail } from "./mail/mailgun.server";
+import { notifyShiftSwapAccepted } from "./shift-swap-notifications.server";
 
 const TABLES = new Set([
   "bus_companies", "custom_role_permissions", "custom_roles", "invitations", "join_requests", "labels", "member_permissions", "milestones",
@@ -171,9 +172,24 @@ export async function handleDataRequest(request: Request) {
           );
           if (!eligible.rowCount) throw new Error("Tasks can only be assigned to members with Projects access");
         }
+        const changedValues = Array.isArray(body.values) ? body.values[0] : body.values ?? {};
+        if (body.operation === "update" && Object.prototype.hasOwnProperty.call(changedValues, "priority")) {
+          const projectIds = [...new Set(result.rows.map((row) => row.project_id).filter(Boolean))];
+          const permitted = await client.query(
+            `SELECT DISTINCT p.id
+             FROM projects p
+             JOIN organization_members m ON m.organization_id=p.organization_id
+             WHERE p.id = ANY($1::uuid[]) AND m.user_id=$2 AND m.role IN ('owner','admin')`,
+            [projectIds, session.user.id],
+          );
+          if (permitted.rowCount !== projectIds.length) throw new Error("Only workspace admins can change task priority after creation");
+        }
       }
     }
     await client.query("COMMIT");
+    if (body.operation === "rpc" && body.fn === "apply_shift_swap" && typeof body.params?._request_id === "string") {
+      await notifyShiftSwapAccepted(body.params._request_id).catch((error) => console.error("Unable to notify shift requester", error));
+    }
     if (!["select", "rpc"].includes(body.operation)) {
       const resourceId = result.rows[0]?.id ? String(result.rows[0].id) : null;
       await getPool().query("INSERT INTO public.audit_events (user_id, action, resource_type, resource_id, metadata) VALUES ($1,$2,$3,$4,$5)", [session.user.id, body.operation, body.table, resourceId, JSON.stringify({ rowCount: result.rowCount })]);
@@ -197,8 +213,84 @@ export async function handleDataRequest(request: Request) {
         });
       }
       if (body.table === "tasks" && ["insert", "update"].includes(body.operation) && row?.assignee_id && Object.prototype.hasOwnProperty.call(Array.isArray(body.values) ? body.values[0] : body.values ?? {}, "assignee_id")) {
-        const profile = await getPool().query("SELECT email FROM profiles WHERE id=$1", [row.assignee_id]);
-        if (profile.rows[0]?.email) await sendTransactionalEmail({ kind: "task-assignment", to: profile.rows[0].email, subject: "A task was assigned to you", text: `Task: ${row.title}` });
+        const context = await getPool().query(
+          `SELECT p.key,p.name AS project_name,COALESCE(NULLIF(pr.email,''),u.email) AS email
+           FROM projects p
+           JOIN "user" u ON u.id=$2
+           LEFT JOIN profiles pr ON pr.id=u.id
+           WHERE p.id=$1`,
+          [row.project_id, row.assignee_id],
+        );
+        const assignment = context.rows[0];
+        if (assignment) {
+          const taskRef = `${assignment.key}-${row.number}`;
+          const href = `/app/projects/${encodeURIComponent(assignment.key)}?task=${encodeURIComponent(row.id)}`;
+          const url = `${getServerConfig().appUrl}${href}`;
+          const dedupeVersion = row.updated_at ?? row.created_at ?? new Date().toISOString();
+          await getPool().query(
+            `INSERT INTO system_notifications(user_id,kind,title,body,href,dedupe_key)
+             VALUES($1,'task-assignment',$2,$3,$4,$5)
+             ON CONFLICT(user_id,dedupe_key) DO NOTHING`,
+            [
+              row.assignee_id,
+              `Task assigned: ${taskRef}`,
+              row.title,
+              href,
+              `task-assignment:${row.id}:${row.assignee_id}:${dedupeVersion}`,
+            ],
+          );
+          if (assignment.email) {
+            await sendTransactionalEmail({
+              kind: "task-assignment",
+              to: assignment.email,
+              subject: `You were assigned ${taskRef}`,
+              text: `You have been assigned a task in ${assignment.project_name}.\n\n${taskRef}: ${row.title}\n\nView task: ${url}`,
+              html: `<p>You have been assigned a task in <strong>${escapeEmailHtml(assignment.project_name)}</strong>.</p><p><strong>${escapeEmailHtml(taskRef)}</strong><br>${escapeEmailHtml(row.title)}</p><p><a href="${escapeEmailHtml(url)}">View task</a></p>`,
+            });
+          }
+        }
+      }
+      if (body.table === "tasks" && body.operation === "update" && row?.status === "done" && (Array.isArray(body.values) ? body.values[0] : body.values ?? {}).status === "done") {
+        const context = await getPool().query(
+          `SELECT p.key,p.name AS project_name
+           FROM projects p
+           WHERE p.id=$1`,
+          [row.project_id],
+        );
+        const project = context.rows[0];
+        if (project) {
+          const taskRef = `${project.key}-${row.number}`;
+          const href = `/app/projects/${encodeURIComponent(project.key)}?task=${encodeURIComponent(row.id)}`;
+          const url = `${getServerConfig().appUrl}${href}`;
+          const recipientIds = [...new Set([row.reporter_id, row.created_by].filter((id): id is string => Boolean(id && id !== session.user.id)))];
+          if (recipientIds.length) {
+            const recipients = await getPool().query(
+              `SELECT u.id,COALESCE(NULLIF(pr.email,''),u.email) AS email
+               FROM "user" u
+               LEFT JOIN profiles pr ON pr.id=u.id
+               WHERE u.id = ANY($1::uuid[])`,
+              [recipientIds],
+            );
+            for (const recipient of recipients.rows) {
+              const inserted = await getPool().query(
+                `INSERT INTO system_notifications(user_id,kind,title,body,href,dedupe_key)
+                 VALUES($1,'task-completed',$2,$3,$4,$5)
+                 ON CONFLICT(user_id,dedupe_key) DO NOTHING
+                 RETURNING id`,
+                [recipient.id, `Task completed: ${taskRef}`, row.title, href, `task-completed:${row.id}`],
+              );
+              if (inserted.rowCount && recipient.email) {
+                await sendTransactionalEmail({
+                  kind: "task-completed",
+                  to: recipient.email,
+                  subject: `${taskRef} has been completed`,
+                  text: `A task in ${project.project_name} has been marked as done.\n\n${taskRef}: ${row.title}\n\nView completed task: ${url}`,
+                  html: `<p>A task in <strong>${escapeEmailHtml(project.project_name)}</strong> has been marked as done.</p><p><strong>${escapeEmailHtml(taskRef)}</strong><br>${escapeEmailHtml(row.title)}</p><p><a href="${escapeEmailHtml(url)}">View completed task</a></p>`,
+                });
+              }
+            }
+          }
+        }
       }
       if (body.table === "shifts" && body.operation === "insert") {
         for (const shift of result.rows) {

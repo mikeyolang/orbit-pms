@@ -27,7 +27,7 @@ export function getAuth() {
           to: user.email,
           subject: "Reset your Orbit password",
           text: `We received a request to reset your Orbit password. Use this secure link to choose a new password: ${url}\n\nIf you did not request this, you can safely ignore this email.`,
-          html: `<p style="margin:0 0 18px">We received a request to reset your Orbit password.</p><p style="margin:0 0 24px"><a href="${safeUrl}" style="display:inline-block;border-radius:8px;background:#4f46e5;color:#fff;padding:12px 20px;font-weight:700;text-decoration:none">Choose a new password</a></p><p style="margin:0 0 10px;font-size:13px;color:#6b7280">For your security, this link can only be used to reset the password for this account.</p><p style="margin:0;font-size:13px;color:#6b7280">If you did not request this, you can safely ignore this email.</p>`,
+          html: `<p style="margin:0 0 18px">We received a request to reset your Orbit password.</p><p style="margin:0 0 24px"><a href="${safeUrl}" style="display:inline-block;border-radius:8px;background:#1B3673;color:#fff;padding:12px 20px;font-weight:700;text-decoration:none">Choose a new password</a></p><p style="margin:0 0 10px;font-size:13px;color:#6b7280">For your security, this link can only be used to reset the password for this account.</p><p style="margin:0;font-size:13px;color:#6b7280">If you did not request this, you can safely ignore this email.</p>`,
         });
       },
     },

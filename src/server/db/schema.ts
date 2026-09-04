@@ -111,6 +111,22 @@ export const organizations = pgTable(
   (table) => [uniqueIndex("organizations_slug_unique").on(table.slug)],
 );
 
+export const customRoles = pgTable(
+  "custom_roles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizations.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    description: text("description"),
+    baseRole: orgRole("base_role").default("member").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("custom_roles_organization_name_unique").on(table.organizationId, table.name)],
+);
+
 export const organizationMembers = pgTable(
   "organization_members",
   {
@@ -122,6 +138,7 @@ export const organizationMembers = pgTable(
       .notNull()
       .references(() => user.id, { onDelete: "cascade" }),
     role: orgRole("role").default("member").notNull(),
+    customRoleId: uuid("custom_role_id").references(() => customRoles.id, { onDelete: "set null" }),
     isSupportOnly: boolean("is_support_only").default(false).notNull(),
     canAccessProjects: boolean("can_access_projects").default(true).notNull(),
     canAccessShifts: boolean("can_access_shifts").default(true).notNull(),

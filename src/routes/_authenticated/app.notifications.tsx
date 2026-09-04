@@ -3,8 +3,9 @@ import { useCallback, useEffect, useState } from "react";
 import { postgres } from "@/integrations/postgres/client";
 import { useAuthSession } from "@/lib/auth";
 import { useOrg } from "@/components/app/app-shell";
-import { Bell, Loader2, MessageSquare, Activity } from "lucide-react";
+import { Bell, Loader2, MessageSquare, Activity, CheckCheck } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
+import { Button } from "@/components/ui/button";
 
 export const Route = createFileRoute("/_authenticated/app/notifications")({
   component: InboxPage,
@@ -29,12 +30,13 @@ type CommentItem = {
   author?: { full_name: string | null; email: string | null } | null;
 };
 type InboxItem = ActivityItem | CommentItem;
+type SystemItem = { id: string; kind: string; title: string; body: string; href: string | null; read_at: string | null; created_at: string };
 
 function InboxPage() {
   const { user } = useAuthSession();
   const { currentOrg } = useOrg();
   const [items, setItems] = useState<InboxItem[] | null>(null);
-  const [systemItems, setSystemItems] = useState<any[]>([]);
+  const [systemItems, setSystemItems] = useState<SystemItem[]>([]);
 
   const load = useCallback(async () => {
     if (!user) return;
@@ -120,22 +122,39 @@ function InboxPage() {
     load();
   }, [load]);
 
+  async function markRead(id: string) {
+    const readAt = new Date().toISOString();
+    const { error } = await postgres.from("system_notifications").update({ read_at: readAt }).eq("id", id);
+    if (!error) setSystemItems((current) => current.map((item) => item.id === id ? { ...item, read_at: readAt } : item));
+  }
+
+  async function markAllRead() {
+    const unread = systemItems.filter((item) => !item.read_at);
+    if (!unread.length) return;
+    const readAt = new Date().toISOString();
+    const { error } = await postgres.from("system_notifications").update({ read_at: readAt }).in("id", unread.map((item) => item.id));
+    if (!error) setSystemItems((current) => current.map((item) => ({ ...item, read_at: item.read_at ?? readAt })));
+  }
+
+  const unreadCount = systemItems.filter((item) => !item.read_at).length;
+
   return (
     <div className="mx-auto max-w-4xl px-8 py-8">
-      <div className="flex items-center gap-3">
+      <div className="flex items-center justify-between gap-3">
         <div>
           <h1 className="text-2xl font-semibold tracking-tight">Inbox</h1>
-          <p className="mt-1 text-sm text-muted-foreground">Recent activity and comments on tasks you're involved with.</p>
+          <p className="mt-1 text-sm text-muted-foreground">Notifications, recent activity, and comments relevant to you.</p>
         </div>
+        {unreadCount > 0 && <Button size="sm" variant="outline" onClick={markAllRead}><CheckCheck className="h-4 w-4" />Mark all read</Button>}
       </div>
 
       <div className="mt-6 overflow-hidden rounded-xl border border-border bg-card">
-        {systemItems.length > 0 && <ul className="divide-y divide-border border-b border-border">{systemItems.map((notice) => <li key={notice.id} className="flex gap-3 bg-warning/5 px-4 py-3"><Bell className="mt-0.5 h-4 w-4 text-warning" /><div className="min-w-0 flex-1"><div className="text-sm font-medium">{notice.title}</div><div className="text-xs text-muted-foreground">{notice.body}</div>{notice.href && <Link to={notice.href as any} className="mt-1 inline-block text-xs text-primary hover:underline">Review</Link>}</div></li>)}</ul>}
+        {systemItems.length > 0 && <ul className="divide-y divide-border border-b border-border">{systemItems.map((notice) => <li key={notice.id} className={`flex gap-3 px-4 py-3 ${notice.read_at ? "bg-card" : "bg-primary/5"}`}><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${notice.read_at ? "bg-muted-foreground/30" : "bg-red-500"}`} /><Bell className={`mt-0.5 h-4 w-4 ${notice.read_at ? "text-muted-foreground" : "text-primary"}`} /><div className="min-w-0 flex-1"><div className={`text-sm ${notice.read_at ? "font-medium" : "font-semibold"}`}>{notice.title}</div><div className="text-xs text-muted-foreground">{notice.body}</div><div className="mt-1 flex items-center gap-3 text-xs"><span className="text-muted-foreground">{formatDistanceToNow(new Date(notice.created_at), { addSuffix: true })}</span>{notice.href && <Link to={notice.href as any} onClick={() => void markRead(notice.id)} className="font-medium text-primary hover:underline">{notice.kind === "task-assignment" || notice.kind === "task-completed" ? "View task" : "Review"}</Link>}{!notice.read_at && <button type="button" onClick={() => void markRead(notice.id)} className="text-muted-foreground hover:text-foreground">Mark read</button>}</div></div></li>)}</ul>}
         {items === null ? (
           <div className="flex justify-center py-16">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
-        ) : items.length === 0 ? (
+        ) : items.length === 0 && systemItems.length === 0 ? (
           <div className="flex flex-col items-center px-6 py-16 text-center">
             <Bell className="h-8 w-8 text-muted-foreground" />
             <h3 className="mt-3 text-sm font-medium">You're all caught up</h3>

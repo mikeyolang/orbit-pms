@@ -67,7 +67,7 @@ function ResetPassword() {
           <Label className="text-xs font-medium text-muted-foreground">Confirm password</Label>
           <PasswordField visible={showConfirm} onToggle={() => setShowConfirm((value) => !value)} value={confirm} onChange={(e) => setConfirm(e.target.value)} />
         </div>
-        <Button type="submit" className="w-full bg-gradient-to-r from-violet-600 to-blue-600 text-white hover:from-violet-700 hover:to-blue-700" disabled={loading}>
+        <Button type="submit" className="w-full bg-[#1B3673] text-white hover:bg-[#142A5C]" disabled={loading}>
           {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
           Update password
         </Button>

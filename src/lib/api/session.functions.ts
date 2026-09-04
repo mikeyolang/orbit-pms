@@ -12,6 +12,7 @@ export const getMyMemberships = createServerFn({ method: "GET" }).handler(async 
     .select({
       organization_id: schema.organizationMembers.organizationId,
       role: schema.organizationMembers.role,
+      custom_role_name: schema.customRoles.name,
       is_support_only: schema.organizationMembers.isSupportOnly,
       can_access_projects: schema.organizationMembers.canAccessProjects,
       can_access_shifts: schema.organizationMembers.canAccessShifts,
@@ -27,6 +28,7 @@ export const getMyMemberships = createServerFn({ method: "GET" }).handler(async 
       schema.organizations,
       eq(schema.organizationMembers.organizationId, schema.organizations.id),
     )
+    .leftJoin(schema.customRoles, eq(schema.organizationMembers.customRoleId, schema.customRoles.id))
     .where(eq(schema.organizationMembers.userId, user.id));
   return rows;
 });

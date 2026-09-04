@@ -15,6 +15,7 @@ import {
 import { NewTaskDialog } from "./new-task-dialog";
 import { TaskCommentsActivity } from "./task-comments";
 import { MemberCombobox } from "./member-combobox";
+import { useOrg } from "./app-shell";
 
 interface Member { user_id: string; full_name: string | null; email: string | null }
 
@@ -27,6 +28,8 @@ export function TaskDetailSheet({
   onChanged: () => void;
   projectKey: string;
 }) {
+  const { role } = useOrg();
+  const canChangePriority = role === "owner" || role === "admin";
   const [t, setT] = useState<Task | null>(task);
   const [members, setMembers] = useState<Member[]>([]);
   const [labels, setLabels] = useState<LabelRow[]>([]);
@@ -154,7 +157,7 @@ export function TaskDetailSheet({
           <div className="grid grid-cols-2 gap-3">
             <Sel label="Status" value={t.status} onChange={(v) => patch({ status: v as never })}
               options={TASK_STATUSES.map((s) => ({ value: s.value, label: s.label }))} />
-            <Sel label="Priority" value={t.priority} onChange={(v) => patch({ priority: v as never })}
+            <Sel label={canChangePriority ? "Priority" : "Priority · Admin only"} value={t.priority} disabled={!canChangePriority} onChange={(v) => patch({ priority: v as never })}
               options={TASK_PRIORITIES.map((p) => ({ value: p.value, label: p.label }))} />
             <FieldL label="Assignee"><MemberCombobox members={members} value={t.assignee_id ?? "none"} onChange={(v) => patch({ assignee_id: v === "none" ? null : v })} /></FieldL>
             <FieldL label="Due date">
@@ -280,14 +283,15 @@ function FieldL({ label, children }: { label: string; children: React.ReactNode 
   );
 }
 
-function Sel({ label, value, onChange, options }: {
+function Sel({ label, value, onChange, options, disabled = false }: {
   label: string; value: string; onChange: (v: string) => void;
   options: { value: string; label: string }[];
+  disabled?: boolean;
 }) {
   return (
     <FieldL label={label}>
-      <Select value={value} onValueChange={onChange}>
-        <SelectTrigger><SelectValue /></SelectTrigger>
+      <Select value={value} onValueChange={onChange} disabled={disabled}>
+        <SelectTrigger className={disabled ? "cursor-not-allowed bg-muted/40 opacity-75" : undefined}><SelectValue /></SelectTrigger>
         <SelectContent>
           {options.map((o) => <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>)}
         </SelectContent>

@@ -41,7 +41,7 @@ function Landing() {
       <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link to="/" className="flex items-center gap-2.5 font-bold tracking-tight">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-gradient-to-br from-violet-600 to-blue-600 text-xs text-white shadow-md">H</div>
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#1B3673] text-xs text-white shadow-md">H</div>
             <span className="text-lg">Helix</span>
           </Link>
           <div className="flex items-center gap-2">
@@ -68,21 +68,21 @@ function Landing() {
       </header>
       <main>
         <section className="relative overflow-hidden px-6 py-24 text-center md:py-32">
-          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(124,58,237,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(37,99,235,0.12),transparent_35%)]" />
+          <div className="absolute inset-0 -z-10 bg-[radial-gradient(circle_at_top_left,rgba(27,54,115,0.12),transparent_35%),radial-gradient(circle_at_top_right,rgba(27,54,115,0.12),transparent_35%)]" />
           <div className="mx-auto mb-6 inline-flex items-center gap-2 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-xs font-semibold text-indigo-700 dark:border-indigo-500/25 dark:bg-indigo-500/10 dark:text-indigo-200">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
             One workspace for projects, people and shifts
           </div>
           <h1 className="mx-auto max-w-4xl text-5xl font-bold tracking-tight md:text-6xl">
             Keep every team moving,{" "}
-            <span className="bg-gradient-to-r from-violet-600 to-blue-600 bg-clip-text text-transparent">all in one place.</span>
+            <span className="text-[#1B3673] dark:text-blue-300">all in one place.</span>
           </h1>
           <p className="mx-auto mt-6 max-w-xl text-base text-muted-foreground">
             Plan projects, coordinate shifts, manage your team, and turn daily work into clear reports—all from one calm, connected workspace.
           </p>
           <div className="mt-8 flex items-center justify-center gap-3">
             <Link to="/auth" search={{ mode: "signup" }}>
-              <Button size="lg" className="gap-2 bg-gradient-to-r from-violet-600 to-blue-600 text-white shadow-lg shadow-indigo-500/20 hover:from-violet-700 hover:to-blue-700">
+              <Button size="lg" className="gap-2 bg-[#1B3673] text-white shadow-lg shadow-[#1B3673]/20 hover:bg-[#142A5C]">
                 Create your workspace <ArrowRight className="h-4 w-4" />
               </Button>
             </Link>

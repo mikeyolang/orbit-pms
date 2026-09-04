@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { getAuth } from "@/server/auth.server";
 import { getPool } from "@/server/db/client.server";
+import { notifyShiftSwapAccepted } from "@/server/shift-swap-notifications.server";
 
 export const Route = createFileRoute("/api/shift-request/$token")({ server: { handlers: {
   GET: async ({ params }) => {
@@ -24,6 +25,7 @@ export const Route = createFileRoute("/api/shift-request/$token")({ server: { ha
       else if (action === "decline" && row.kind !== "open") await client.query("UPDATE shift_swap_requests SET status='declined',decided_by=$1,decided_at=now() WHERE id=$2", [session.user.id, row.id]);
       else throw new Error("Invalid action");
       await client.query("COMMIT");
+      if (action === "accept") await notifyShiftSwapAccepted(row.id).catch((error) => console.error("Unable to notify shift requester", error));
       return Response.json({ ok: true, action });
     } catch (error) { await client.query("ROLLBACK"); return Response.json({ error: error instanceof Error ? error.message : "Unable to respond" }, { status: 400 }); }
     finally { client.release(); }

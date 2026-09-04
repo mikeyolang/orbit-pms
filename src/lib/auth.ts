@@ -7,10 +7,16 @@ export type OrgRole = "owner" | "admin" | "manager" | "member" | "viewer";
 export interface OrgMembership {
   organization_id: string;
   role: OrgRole;
+  custom_role_name?: string | null;
   organization: { id: string; name: string; slug: string; invite_code?: string | null };
   is_support_only?: boolean;
   can_access_projects?: boolean;
   can_access_shifts?: boolean;
+}
+
+export function membershipRoleLabel(membership: Pick<OrgMembership, "role" | "custom_role_name">) {
+  if (membership.custom_role_name?.trim()) return membership.custom_role_name.trim();
+  return membership.role.replaceAll("_", " ").replace(/\b\w/g, (letter) => letter.toUpperCase());
 }
 
 export type AppUser = {

@@ -749,6 +749,7 @@ export type Database = {
           end_date: string | null
           goal: string | null
           id: string
+          milestone_id: string | null
           name: string
           project_id: string
           start_date: string | null
@@ -761,6 +762,7 @@ export type Database = {
           end_date?: string | null
           goal?: string | null
           id?: string
+          milestone_id?: string | null
           name: string
           project_id: string
           start_date?: string | null
@@ -773,6 +775,7 @@ export type Database = {
           end_date?: string | null
           goal?: string | null
           id?: string
+          milestone_id?: string | null
           name?: string
           project_id?: string
           start_date?: string | null
@@ -780,6 +783,13 @@ export type Database = {
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "sprints_milestone_id_fkey"
+            columns: ["milestone_id"]
+            isOneToOne: false
+            referencedRelation: "milestones"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "sprints_project_id_fkey"
             columns: ["project_id"]

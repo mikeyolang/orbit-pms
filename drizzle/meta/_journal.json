@@ -148,6 +148,13 @@
       "when": 1788447000000,
       "tag": "0020_link_sprints_to_milestones",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1788533400000,
+      "tag": "0021_refresh_bus_company_catalogue",
+      "breakpoints": true
     }
   ]
 }

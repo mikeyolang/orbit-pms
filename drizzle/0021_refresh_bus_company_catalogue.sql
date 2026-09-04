@@ -1,0 +1,83 @@
+WITH company_names(name) AS (VALUES
+  ('AMANA COACH'),
+  ('AMBASA COACH'),
+  ('ABBYSINIA'),
+  ('BAHSAN LUXURY LIMITED'),
+  ('BASHCAR BUS SERVICE'),
+  ('BUSCAR'),
+  ('COAST BUS'),
+  ('DREAM CRUISER'),
+  ('DREAMLINE EXPRESS'),
+  ('ENA COACH'),
+  ('GARISSA COACH'),
+  ('GOLDEN COACH'),
+  ('GRAND BUS'),
+  ('KIDIA ONE EXPRESS'),
+  ('LEGEND COACH'),
+  ('LIBAN'),
+  ('LIBAN KAKUMA'),
+  ('LIBAN COACH'),
+  ('MABRUK CLASSIC'),
+  ('MARANGU LUXURY COACH'),
+  ('MASH E.A'),
+  ('MOYALE STAR'),
+  ('RAYAN COACH'),
+  ('RAYAN CLASSIC'),
+  ('REMBO SHUTTLE'),
+  ('ROYAL AIR BUS'),
+  ('ROYAL LINER'),
+  ('ROYAL TRAVELLERS'),
+  ('SALUM RASHID'),
+  ('SIMBA COOL'),
+  ('TAHMEED EXPRESS'),
+  ('TEAM SWATT'),
+  ('UMMA'),
+  ('WAJIR COACH'),
+  ('ZAIN COACHES')
+)
+UPDATE public.bus_companies
+SET is_active = false
+WHERE name NOT IN (SELECT name FROM company_names);
+--> statement-breakpoint
+WITH company_names(name) AS (VALUES
+  ('AMANA COACH'),
+  ('AMBASA COACH'),
+  ('ABBYSINIA'),
+  ('BAHSAN LUXURY LIMITED'),
+  ('BASHCAR BUS SERVICE'),
+  ('BUSCAR'),
+  ('COAST BUS'),
+  ('DREAM CRUISER'),
+  ('DREAMLINE EXPRESS'),
+  ('ENA COACH'),
+  ('GARISSA COACH'),
+  ('GOLDEN COACH'),
+  ('GRAND BUS'),
+  ('KIDIA ONE EXPRESS'),
+  ('LEGEND COACH'),
+  ('LIBAN'),
+  ('LIBAN KAKUMA'),
+  ('LIBAN COACH'),
+  ('MABRUK CLASSIC'),
+  ('MARANGU LUXURY COACH'),
+  ('MASH E.A'),
+  ('MOYALE STAR'),
+  ('RAYAN COACH'),
+  ('RAYAN CLASSIC'),
+  ('REMBO SHUTTLE'),
+  ('ROYAL AIR BUS'),
+  ('ROYAL LINER'),
+  ('ROYAL TRAVELLERS'),
+  ('SALUM RASHID'),
+  ('SIMBA COOL'),
+  ('TAHMEED EXPRESS'),
+  ('TEAM SWATT'),
+  ('UMMA'),
+  ('WAJIR COACH'),
+  ('ZAIN COACHES')
+)
+INSERT INTO public.bus_companies(organization_id,name,is_active)
+SELECT organization.id, company_names.name, true
+FROM public.organizations AS organization
+CROSS JOIN company_names
+ON CONFLICT(organization_id,name) DO UPDATE SET is_active = true;

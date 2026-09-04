@@ -33,7 +33,7 @@ import {
   Plus,
   UserCog,
 } from "lucide-react";
-import { membershipRoleLabel, setCurrentOrgId, type OrgMembership } from "@/lib/auth";
+import { membershipRoleLabel, setCurrentOrgId, signOutAndRedirect, type OrgMembership } from "@/lib/auth";
 import { getMyMemberships } from "@/lib/api/session.functions";
 
 export const Route = createFileRoute("/_authenticated/onboarding")({
@@ -115,8 +115,7 @@ function WorkspaceHome() {
   }
 
   async function signOut() {
-    await postgres.auth.signOut();
-    navigate({ to: "/auth" });
+    await signOutAndRedirect();
   }
 
   const pendingRequests = requests.filter((r) => r.status === "pending");

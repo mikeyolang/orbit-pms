@@ -1,8 +1,8 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { z } from "zod";
 import { postgres } from "@/integrations/postgres/client";
-import { useAuthSession, setCurrentOrgId } from "@/lib/auth";
+import { useAuthSession, setCurrentOrgId, signOutAndRedirect } from "@/lib/auth";
 import { useOrg } from "@/components/app/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,7 +20,6 @@ export const Route = createFileRoute("/_authenticated/app/settings")({
 });
 
 function SettingsPage() {
-  const navigate = useNavigate();
   const { user } = useAuthSession();
   const { currentOrg, role, refresh } = useOrg();
   const canManage = role === "owner" || role === "admin";
@@ -96,8 +95,7 @@ function SettingsPage() {
   }
 
   async function signOut() {
-    await postgres.auth.signOut();
-    navigate({ to: "/auth" });
+    await signOutAndRedirect();
   }
 
   return (

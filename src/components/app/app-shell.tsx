@@ -16,13 +16,14 @@ import {
 } from "lucide-react";
 
 import { ThemeToggle } from "@/components/theme-toggle";
-import { authClient } from "@/lib/auth-client";
 import { postgres } from "@/integrations/postgres/client";
 import {
   useAuthSession,
   useMemberships,
   getCurrentOrgId,
   membershipRoleLabel,
+  isSigningOut,
+  signOutAndRedirect,
   setCurrentOrgId,
   type OrgMembership,
 } from "@/lib/auth";
@@ -45,6 +46,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [currentOrg, setCurrentOrg] = useState<OrgMembership | null>(null);
   const [isSupportOnly, setIsSupportOnly] = useState(false);
   const [unreadNotifications, setUnreadNotifications] = useState(0);
+  const [signingOut, setSigningOut] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { can: canCurrent } = useMyPermissions(currentOrg?.organization_id);
 
@@ -78,10 +80,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [user, pathname]);
 
   useEffect(() => {
-    if (!sessionLoading && !memLoading && memberships.length === 0) {
+    if (!signingOut && !isSigningOut() && !sessionLoading && !memLoading && memberships.length === 0) {
       navigate({ to: "/onboarding" });
     }
-  }, [sessionLoading, memLoading, memberships, navigate]);
+  }, [sessionLoading, memLoading, memberships, navigate, signingOut]);
 
   if (sessionLoading || memLoading || !currentOrg) {
     return (
@@ -121,13 +123,13 @@ export function AppShell({ children }: { children: ReactNode }) {
     item.exact ? pathname === item.to : pathname === item.to || pathname.startsWith(`${item.to}/`);
 
   const allowed = nav.some(matchesNavItem);
-  if (!allowed && !pathname.startsWith("/onboarding")) {
+  if (!signingOut && !isSigningOut() && !allowed && !pathname.startsWith("/onboarding")) {
     navigate({ to: currentOrg.can_access_shifts !== false ? "/app/shifts" : "/app", replace: true });
   }
 
   async function signOut() {
-    await authClient.signOut();
-    navigate({ to: "/auth" });
+    setSigningOut(true);
+    await signOutAndRedirect();
   }
 
   return (
@@ -227,9 +229,9 @@ export function AppShell({ children }: { children: ReactNode }) {
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem onClick={signOut}>
-                <LogOut className="h-4 w-4" />
-                Sign out
+              <DropdownMenuItem onClick={signOut} disabled={signingOut}>
+                {signingOut ? <div className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" /> : <LogOut className="h-4 w-4" />}
+                {signingOut ? "Signing out…" : "Sign out"}
               </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>

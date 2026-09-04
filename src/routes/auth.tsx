@@ -30,11 +30,11 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
 
-  // Already signed in? Keep the session and go straight into the app.
+  // Already signed in? Show the personal workspace dashboard.
   useEffect(() => {
     let active = true;
     authClient.getSession().then(({ data }) => {
-      if (active && data?.session && !invite) navigate({ to: "/app", replace: true });
+      if (active && data?.session && !invite) navigate({ to: "/onboarding", replace: true });
     });
     return () => {
       active = false;
@@ -64,7 +64,7 @@ function AuthPage() {
       name: parsed.data.fullName,
       email: parsed.data.email,
       password: parsed.data.password,
-      callbackURL: invite ? `/accept-invite/${invite}?accept=1` : "/app",
+      callbackURL: invite ? `/accept-invite/${invite}?accept=1` : "/onboarding",
     });
     if (error) {
       setLoading(false);
@@ -89,7 +89,7 @@ function AuthPage() {
       return;
     }
     setLoading(true);
-    const { error } = await authClient.signIn.email({ ...parsed.data, callbackURL: "/app" });
+    const { error } = await authClient.signIn.email({ ...parsed.data, callbackURL: "/onboarding" });
     setLoading(false);
     if (error) {
       toast.error(error.message);
@@ -99,7 +99,7 @@ function AuthPage() {
     if (invite) {
       navigate({ to: "/accept-invite/$token", params: { token: invite } });
     } else {
-      navigate({ to: "/app" });
+      navigate({ to: "/onboarding" });
     }
   }
 

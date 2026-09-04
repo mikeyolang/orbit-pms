@@ -28,7 +28,7 @@ function Landing() {
       if (!active) return;
       if (data?.session) {
         setSignedIn(true);
-        navigate({ to: "/app", replace: true });
+        navigate({ to: "/onboarding", replace: true });
       }
     });
     return () => {

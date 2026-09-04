@@ -79,6 +79,25 @@ export function useMemberships(user: AppUser | null) {
 }
 
 const CURRENT_ORG_KEY = "current_org_id";
+let signOutInProgress = false;
+
+export function isSigningOut() {
+  return signOutInProgress;
+}
+
+export async function signOutAndRedirect() {
+  if (signOutInProgress) return;
+  signOutInProgress = true;
+  try {
+    await authClient.signOut();
+  } finally {
+    if (typeof window !== "undefined") {
+      localStorage.removeItem(CURRENT_ORG_KEY);
+      window.location.replace("/auth");
+    }
+  }
+}
+
 export function getCurrentOrgId(): string | null {
   if (typeof window === "undefined") return null;
   return localStorage.getItem(CURRENT_ORG_KEY);

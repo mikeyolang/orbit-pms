@@ -186,10 +186,28 @@ function TeamPage() {
   const roleName = (role: OrgRole, customRoleId: string | null) => customRoles.find((r) => r.id === customRoleId)?.name ?? role;
   const visibleMembers = canManage ? members : members.filter((member) => member.user_id === signedInUser?.id || member.invited_by === signedInUser?.id);
 
-  function copyInviteLink(token: string) {
-    const url = `${window.location.origin}/accept-invite/${token}`;
-    navigator.clipboard.writeText(url);
-    toast.success("Invite link copied");
+  async function copyInviteLink(token: string) {
+    const configuredOrigin = (import.meta.env.VITE_APP_URL as string | undefined)?.replace(/\/$/, "");
+    const url = `${configuredOrigin || window.location.origin}/accept-invite/${encodeURIComponent(token)}`;
+    try {
+      if (navigator.clipboard?.writeText && window.isSecureContext) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const textArea = document.createElement("textarea");
+        textArea.value = url;
+        textArea.setAttribute("readonly", "");
+        textArea.style.position = "fixed";
+        textArea.style.left = "-9999px";
+        document.body.appendChild(textArea);
+        textArea.select();
+        const copied = document.execCommand("copy");
+        textArea.remove();
+        if (!copied) throw new Error("Clipboard copy was blocked");
+      }
+      toast.success("Invite link copied");
+    } catch {
+      toast.error("Could not copy the link. Check your browser's clipboard permission.");
+    }
   }
 
   function openInviteForm() {

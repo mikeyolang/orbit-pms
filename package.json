@@ -11,7 +11,7 @@
     "lint": "eslint .",
     "format": "prettier --write .",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "drizzle-kit migrate",
+    "db:migrate": "node --env-file-if-exists=.env scripts/migrate.mjs",
     "db:import-app-schema": "node --env-file=.env scripts/import-app-schema.mjs",
     "db:migrate-data": "node --env-file=.env scripts/migrate-data.mjs",
     "db:verify-migration": "node --env-file=.env scripts/verify-migration.mjs",

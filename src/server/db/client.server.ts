@@ -10,13 +10,13 @@ let database: ReturnType<typeof drizzle<typeof schema>> | undefined;
 
 export function getPool() {
   if (!pool) {
-    const { databaseUrl, nodeEnv } = requireServerConfig("databaseUrl");
+    const { databaseUrl, databaseSsl, nodeEnv } = requireServerConfig("databaseUrl");
     pool = new Pool({
       connectionString: databaseUrl,
       max: nodeEnv === "production" ? 10 : 5,
       idleTimeoutMillis: 30_000,
       connectionTimeoutMillis: 10_000,
-      ssl: nodeEnv === "production" ? { rejectUnauthorized: true } : undefined,
+      ssl: databaseSsl ? { rejectUnauthorized: true } : undefined,
     });
   }
   return pool;

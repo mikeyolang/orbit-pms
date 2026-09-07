@@ -17,9 +17,12 @@ import process from "node:process";
 //     VITE_ prefix. Never put secrets here — they ship to the browser.
 
 export function getServerConfig() {
+  const envBoolean = (value: string | undefined, fallback = false) =>
+    value == null ? fallback : ["1", "true", "yes", "on"].includes(value.toLowerCase());
   return {
     nodeEnv: process.env.NODE_ENV,
     databaseUrl: process.env.DATABASE_URL,
+    databaseSsl: envBoolean(process.env.DATABASE_SSL, process.env.NODE_ENV === "production"),
     authSecret: process.env.BETTER_AUTH_SECRET,
     appUrl: process.env.APP_URL ?? "http://localhost:3000",
     trustedOrigins: process.env.TRUSTED_ORIGINS,
@@ -31,6 +34,11 @@ export function getServerConfig() {
     mailMode: process.env.MAIL_MODE ?? "log",
     mailSmtpHost: process.env.MAIL_SMTP_HOST ?? "127.0.0.1",
     mailSmtpPort: Number(process.env.MAIL_SMTP_PORT ?? "1025"),
+    mailSmtpSecure: envBoolean(process.env.MAIL_SMTP_SECURE),
+    mailSmtpRequireTls: envBoolean(process.env.MAIL_SMTP_REQUIRE_TLS),
+    mailSmtpUser: process.env.MAIL_SMTP_USER,
+    mailSmtpPassword: process.env.MAIL_SMTP_PASSWORD,
+    mailSmtpTimeout: Number(process.env.MAIL_SMTP_TIMEOUT ?? "30000"),
     cronSecret: process.env.CRON_SECRET,
     hrWebhookSecret: process.env.HR_WEBHOOK_SECRET,
   };

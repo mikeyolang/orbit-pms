@@ -31,7 +31,19 @@ async function deliver(message: typeof mailOutbox.$inferSelect) {
     return "local-log";
   }
   if (config.mailMode === "smtp") {
-    const transport = nodemailer.createTransport({ host: config.mailSmtpHost, port: config.mailSmtpPort, secure: false });
+    const transport = nodemailer.createTransport({
+      host: config.mailSmtpHost,
+      port: config.mailSmtpPort,
+      secure: config.mailSmtpSecure,
+      requireTLS: config.mailSmtpRequireTls,
+      auth: config.mailSmtpUser
+        ? { user: config.mailSmtpUser, pass: config.mailSmtpPassword }
+        : undefined,
+      connectionTimeout: config.mailSmtpTimeout,
+      greetingTimeout: config.mailSmtpTimeout,
+      socketTimeout: config.mailSmtpTimeout,
+      tls: { servername: config.mailSmtpHost },
+    });
     const result = await transport.sendMail({ from: config.mailFrom ?? "Orbit <notifications@orbit.local>", to: message.recipient, subject: message.subject, text: message.textBody, html: message.htmlBody ?? undefined });
     return result.messageId;
   }

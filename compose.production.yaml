@@ -1,0 +1,75 @@
+name: orbit-pms-production
+
+x-orbit-image: &orbit-image
+  image: orbit-pms-app:latest
+  build:
+    context: .
+    args:
+      VITE_APP_URL: http://165.227.150.123:8080
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: orbit
+      POSTGRES_USER: orbit
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env.production}
+    volumes:
+      - orbit_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U orbit -d orbit"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - orbit_internal
+
+  migrate:
+    <<: *orbit-image
+    restart: "no"
+    command: ["npm", "run", "db:migrate"]
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql://orbit:${POSTGRES_PASSWORD}@postgres:5432/orbit
+      DATABASE_SSL: "false"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - orbit_internal
+
+  app:
+    <<: *orbit-image
+    restart: unless-stopped
+    env_file:
+      - .env.production
+    environment:
+      DATABASE_URL: postgresql://orbit:${POSTGRES_PASSWORD}@postgres:5432/orbit
+      DATABASE_SSL: "false"
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+    ports:
+      - "8080:3000"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3000/api/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+    networks:
+      - orbit_internal
+
+volumes:
+  orbit_postgres_data:
+
+networks:
+  orbit_internal:

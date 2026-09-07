@@ -15,7 +15,7 @@
     "db:import-app-schema": "node --env-file=.env scripts/import-app-schema.mjs",
     "db:migrate-data": "node --env-file=.env scripts/migrate-data.mjs",
     "db:verify-migration": "node --env-file=.env scripts/verify-migration.mjs",
-    "db:seed": "node --env-file=.env scripts/seed.mjs",
+    "db:seed": "node --env-file-if-exists=.env scripts/seed.mjs",
     "db:studio": "drizzle-kit studio"
   },
   "dependencies": {

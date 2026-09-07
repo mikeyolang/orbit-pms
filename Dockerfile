@@ -2,8 +2,10 @@ FROM node:22-alpine AS application
 
 WORKDIR /app
 
+RUN npm install --global npm@11.16.0
+
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --no-audit --no-fund
 
 COPY . .
 

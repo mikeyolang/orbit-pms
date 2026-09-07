@@ -1,6 +1,6 @@
 # Docker deployment to pms.helapay.africa
 
-The production stack exposes Orbit at `http://pms.helapay.africa`. Nginx is the only public container; Orbit and PostgreSQL are available only on the private Docker network. The one-off `migrate` service applies pending Drizzle migrations before the application starts.
+The production stack exposes Orbit at `http://pms.helapay.africa`. The server's system Nginx is the public gateway; the Orbit container listens only on `127.0.0.1:8080`, and PostgreSQL is available only on the private Docker network. The one-off `migrate` service applies pending Drizzle migrations before the application starts.
 
 ## First deployment
 
@@ -51,7 +51,7 @@ The production stack exposes Orbit at `http://pms.helapay.africa`. Nginx is the 
    ```sh
    docker compose --env-file .env.production -f compose.production.yaml ps
    docker compose --env-file .env.production -f compose.production.yaml logs --tail=100 app
-   curl -H 'Host: pms.helapay.africa' http://127.0.0.1/api/health
+   curl http://127.0.0.1:8080/api/health
    ```
 
    Open `http://pms.helapay.africa` in a browser.
@@ -61,8 +61,8 @@ The production stack exposes Orbit at `http://pms.helapay.africa`. Nginx is the 
 Run `crontab -e` on the server and add the following lines, replacing `YOUR_CRON_SECRET` with the value in `.env.production`:
 
 ```cron
-* * * * * curl -fsS -X POST -H "Host: pms.helapay.africa" -H "Authorization: Bearer YOUR_CRON_SECRET" http://127.0.0.1/api/mail/process >/dev/null 2>&1
-15 1 * * * curl -fsS -X POST -H "Host: pms.helapay.africa" -H "Authorization: Bearer YOUR_CRON_SECRET" http://127.0.0.1/api/notifications/process >/dev/null 2>&1
+* * * * * curl -fsS -X POST -H "Authorization: Bearer YOUR_CRON_SECRET" http://127.0.0.1:8080/api/mail/process >/dev/null 2>&1
+15 1 * * * curl -fsS -X POST -H "Authorization: Bearer YOUR_CRON_SECRET" http://127.0.0.1:8080/api/notifications/process >/dev/null 2>&1
 ```
 
 ## Future deployments

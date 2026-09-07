@@ -1,6 +1,6 @@
-# Docker deployment to 165.227.150.123
+# Docker deployment to pms.helapay.africa
 
-The production stack exposes Orbit at `http://165.227.150.123:8080`. PostgreSQL is available only on the private Docker network. The one-off `migrate` service applies pending Drizzle migrations before the application starts.
+The production stack exposes Orbit at `http://pms.helapay.africa`. Nginx is the only public container; Orbit and PostgreSQL are available only on the private Docker network. The one-off `migrate` service applies pending Drizzle migrations before the application starts.
 
 ## First deployment
 
@@ -34,11 +34,11 @@ The production stack exposes Orbit at `http://165.227.150.123:8080`. PostgreSQL 
 
    ```sh
    ufw allow OpenSSH
-   ufw allow 8080/tcp
+   ufw allow 80/tcp
    ufw enable
    ```
 
-   Also allow TCP port 8080 in the hosting provider's cloud firewall, if one is enabled. Never expose PostgreSQL port 5432.
+   Also allow TCP port 80 in the hosting provider's cloud firewall, if one is enabled. Never expose PostgreSQL port 5432.
 
 5. Build and start the complete stack:
 
@@ -51,18 +51,18 @@ The production stack exposes Orbit at `http://165.227.150.123:8080`. PostgreSQL 
    ```sh
    docker compose --env-file .env.production -f compose.production.yaml ps
    docker compose --env-file .env.production -f compose.production.yaml logs --tail=100 app
-   curl http://127.0.0.1:8080/api/health
+   curl -H 'Host: pms.helapay.africa' http://127.0.0.1/api/health
    ```
 
-   Open `http://165.227.150.123:8080` in a browser.
+   Open `http://pms.helapay.africa` in a browser.
 
 ## Scheduled notification processing
 
 Run `crontab -e` on the server and add the following lines, replacing `YOUR_CRON_SECRET` with the value in `.env.production`:
 
 ```cron
-* * * * * curl -fsS -X POST -H "Authorization: Bearer YOUR_CRON_SECRET" http://127.0.0.1:8080/api/mail/process >/dev/null 2>&1
-15 1 * * * curl -fsS -X POST -H "Authorization: Bearer YOUR_CRON_SECRET" http://127.0.0.1:8080/api/notifications/process >/dev/null 2>&1
+* * * * * curl -fsS -X POST -H "Host: pms.helapay.africa" -H "Authorization: Bearer YOUR_CRON_SECRET" http://127.0.0.1/api/mail/process >/dev/null 2>&1
+15 1 * * * curl -fsS -X POST -H "Host: pms.helapay.africa" -H "Authorization: Bearer YOUR_CRON_SECRET" http://127.0.0.1/api/notifications/process >/dev/null 2>&1
 ```
 
 ## Future deployments

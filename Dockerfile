@@ -9,7 +9,7 @@ RUN npm ci --no-audit --no-fund
 
 COPY . .
 
-ARG VITE_APP_URL=http://165.227.150.123:8080
+ARG VITE_APP_URL=http://pms.helapay.africa
 ENV VITE_APP_URL=$VITE_APP_URL
 ENV NITRO_PRESET=node_server
 

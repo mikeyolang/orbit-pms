@@ -18,8 +18,8 @@ export function AuthShell({
       <header className="relative border-b border-slate-200/80 bg-white/85 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/85">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link to="/" className="flex items-center gap-2.5 font-bold tracking-tight">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#1B3673] text-xs text-white shadow-md">H</div>
-            <span className="text-lg">Helix</span>
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#1B3673] text-xs text-white shadow-md">V</div>
+            <span className="text-lg">Voltic PMS</span>
           </Link>
         </div>
       </header>

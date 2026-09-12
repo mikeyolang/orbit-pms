@@ -68,6 +68,20 @@ services:
     networks:
       - orbit_internal
 
+  notification-worker:
+    <<: *orbit-image
+    restart: unless-stopped
+    command: ["node", "scripts/notification-worker.mjs"]
+    env_file:
+      - .env.production
+    environment:
+      WORKER_APP_URL: http://app:3000
+    depends_on:
+      app:
+        condition: service_healthy
+    networks:
+      - orbit_internal
+
 volumes:
   orbit_postgres_data:
 

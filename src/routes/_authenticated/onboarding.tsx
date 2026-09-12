@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
 import { z } from "zod";
 import { postgres } from "@/integrations/postgres/client";
@@ -133,10 +133,10 @@ function WorkspaceHome() {
     <div className="min-h-screen bg-background">
       <header className="border-b border-border/60">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-6 py-3">
-          <div className="flex items-center gap-2 font-semibold tracking-tight">
-            <div className="h-6 w-6 rounded-md bg-gradient-to-br from-primary to-primary/60" />
-            Helix
-          </div>
+          <Link to="/" className="flex items-center gap-2 font-semibold tracking-tight">
+            <div className="grid h-6 w-6 place-items-center rounded-md bg-primary text-xs text-primary-foreground">V</div>
+            Voltic PMS
+          </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <DropdownMenu>
@@ -385,7 +385,7 @@ function CreateWorkspaceDialog({
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">URL (auto-generated)</Label>
             <div className="flex items-center rounded-md border border-input bg-muted/40 px-3 text-sm text-muted-foreground">
-              <span className="select-none">helix.app/</span>
+              <span className="select-none">Workspace /</span>
               <input
                 value={slug}
                 readOnly

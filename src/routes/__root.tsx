@@ -79,14 +79,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Helix — Project Management for Fast Teams" },
+      { title: "Voltic PMS — Project Management for Fast Teams" },
       {
         name: "description",
         content:
           "Plan sprints, track tasks, and ship together. A modern PM tool inspired by Linear.",
       },
-      { property: "og:title", content: "Helix — Project Management for Fast Teams" },
-      { name: "twitter:title", content: "Helix — Project Management for Fast Teams" },
+      { property: "og:title", content: "Voltic PMS — Project Management for Fast Teams" },
+      { name: "twitter:title", content: "Voltic PMS — Project Management for Fast Teams" },
       {
         property: "og:description",
         content:

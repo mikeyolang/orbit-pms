@@ -142,8 +142,28 @@ In Cloudflare, attach the production custom domain to the deployed Worker. If a 
 - Confirm `https://YOUR_DOMAIN/api/health` returns `{"status":"ok","database":"connected"}`.
 - Test registration, sign-in, password reset, tenant isolation, and the main project/task flows.
 - Register `https://YOUR_DOMAIN/api/mailgun/webhook` in Mailgun when email delivery is enabled.
-- Schedule authenticated `POST` requests to `/api/mail/process` every minute and `/api/notifications/process` daily, using `Authorization: Bearer YOUR_CRON_SECRET`.
+- Schedule authenticated `POST` requests to `/api/mail/process` every minute and `/api/notifications/process` every 15 minutes, using `Authorization: Bearer YOUR_CRON_SECRET`.
 - Keep production secrets out of Git, `.env.example`, build logs, and all `VITE_` variables.
 - Never seed the documented local demo account into staging or production.
 
 For the detailed database cutover and email-delivery procedures, see [docs/database-migration.md](docs/database-migration.md) and [docs/email-notification-testing.md](docs/email-notification-testing.md).
+
+### Task chat and deadline alerts
+
+Task details include a **Chat & activity** tab. Messages are visible to everyone with project access, update live, and notify other task participants in their Inbox. Existing comments remain in the conversation.
+
+Unfinished tasks trigger an admin/owner Inbox alert and queued email within 24 hours of their deadline. Alerts include status, assignee, deadline, last update, and completed subtasks. Overdue tasks also notify their assignee. Each deadline gets one warning and one overdue alert; changing the due date allows a new set of alerts.
+
+For local development, keep the app and Mailpit running and start the worker in another terminal:
+
+```bash
+npm run notifications:worker
+```
+
+Set `CRON_SECRET` in `.env` to the same value used by the app. To capture development email in Mailpit, configure the app with its local SMTP host and port; otherwise mail uses your configured SMTP server. The production Compose file includes a `notification-worker` service, which checks deadlines every 15 minutes and processes queued email every minute. Use this service or an external scheduler, not both.
+
+In task chat, type `@` and choose a person from the access-filtered picker, or choose `@everyone` to notify all current task viewers. Selected mentions are highlighted in the saved message. Tagged users receive a single **You were mentioned** Inbox notification and email linking to the chat; the sender is excluded. Mention emails are queued with the message, attempted immediately in SMTP mode, and retried by the notification worker when needed. Mention identity and task access are validated when the message is saved.
+
+Task chat uses a Server-Sent Events connection backed by PostgreSQL LISTEN/NOTIFY. Each running app process uses one shared database listener. Streams reconnect automatically and reload the conversation to recover missed updates. The UI shows **Live** while connected; eight-second refreshes are used only during a stream outage. Normal message reads and writes retain their project access checks.
+
+Reverse proxies must pass `/api/task-chat/stream` without buffering or caching. The endpoint sets `X-Accel-Buffering: no` and sends a heartbeat every 20 seconds. For Nginx, disable `proxy_buffering`/`proxy_cache` for this path and use `proxy_read_timeout 60s` or longer. The production Node Compose app supports the persistent database listener; other hosting targets need to support long-lived streaming HTTP and PostgreSQL connections.

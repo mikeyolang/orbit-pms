@@ -1,7 +1,8 @@
+import { queueTaskMentionEmails } from "./task-mention-email.server";
 import { getAuth } from "./auth.server";
 import { getPool } from "./db/client.server";
 import { getServerConfig } from "@/lib/config.server";
-import { escapeEmailHtml, sendTransactionalEmail } from "./mail/mailgun.server";
+import { escapeEmailHtml, sendTransactionalEmail, processMailOutbox } from "./mail/mailgun.server";
 import { notifyShiftSwapAccepted } from "./shift-swap-notifications.server";
 
 const TABLES = new Set([
@@ -71,13 +72,22 @@ function filtersSql(filters: Filter[] = [], values: unknown[]) {
   return parts.length ? ` WHERE ${parts.join(" AND ")}` : "";
 }
 
+function databaseValue(table: string, column: string, value: unknown) {
+  // pg treats JavaScript arrays as PostgreSQL arrays, not JSON. Accept either
+  // structured mentions or an already serialized JSON value without double encoding.
+  if (table === "task_comments" && column === "mentions") {
+    return typeof value === "string" ? value : JSON.stringify(value ?? []);
+  }
+  return value ?? null;
+}
+
 function mutationSql(operation: DataRequest["operation"], table: string, body: DataRequest, params: unknown[]) {
   const rows = Array.isArray(body.values) ? body.values : [body.values ?? {}];
   const columns = [...new Set(rows.flatMap((row) => Object.keys(row)))];
   columns.forEach(quoted);
   if (operation === "insert" || operation === "upsert") {
     const tuples = rows.map((row) => `(${columns.map((column) => {
-      params.push(row[column] ?? null); return `$${params.length}`;
+      params.push(databaseValue(table, column, row[column])); return `$${params.length}`;
     }).join(",")})`);
     const conflictColumns = body.onConflict?.split(",").map((column) => quoted(column.trim())).join(",");
     if (operation === "upsert" && !conflictColumns) throw new Error("Upsert conflict columns are required");
@@ -86,7 +96,7 @@ function mutationSql(operation: DataRequest["operation"], table: string, body: D
   }
   if (operation === "update") {
     const row = rows[0];
-    const sets = columns.map((column) => { params.push(row[column] ?? null); return `${quoted(column)} = $${params.length}`; });
+    const sets = columns.map((column) => { params.push(databaseValue(table, column, row[column])); return `${quoted(column)} = $${params.length}`; });
     return `UPDATE public.${quoted(table)} SET ${sets.join(",")}${filtersSql(body.filters, params)} RETURNING *`;
   }
   return `DELETE FROM public.${quoted(table)}${filtersSql(body.filters, params)} RETURNING *`;
@@ -149,6 +159,12 @@ export async function handleDataRequest(request: Request) {
     await client.query("SELECT set_config('app.user_id', $1, true), set_config('app.jwt', $2, true)", [session.user.id, JSON.stringify({ sub: session.user.id, email: session.user.email })]);
     await client.query("SET LOCAL ROLE authenticated");
     let result;
+    const previousAssignees = new Map<string, string | null>();
+    if (body.table === "tasks" && body.operation === "update") {
+      const previousParams: unknown[] = [];
+      const previous = await client.query(`SELECT id,assignee_id FROM tasks${filtersSql(body.filters, previousParams)} FOR UPDATE`, previousParams);
+      for (const task of previous.rows) previousAssignees.set(task.id, task.assignee_id);
+    }
     if (body.operation === "rpc") {
       if (!body.fn || !FUNCTIONS.has(body.fn)) throw new Error("Function is not allowed");
       const entries = Object.entries(body.params ?? {});
@@ -186,7 +202,16 @@ export async function handleDataRequest(request: Request) {
         }
       }
     }
+    if (body.table === "task_comments" && body.operation === "insert") {
+      // The comment mutation above ran under the caller's row-level permissions.
+      // Queue server-owned mail in the same transaction as the saved message.
+      await client.query("RESET ROLE");
+      await queueTaskMentionEmails(client, result.rows.map((row) => String(row.id)));
+    }
     await client.query("COMMIT");
+    if (body.table === "task_comments" && body.operation === "insert" && ["smtp", "log"].includes(getServerConfig().mailMode)) {
+      await processMailOutbox(20).catch((error) => console.error("Mention email delivery deferred to mail worker", error));
+    }
     if (body.operation === "rpc" && body.fn === "apply_shift_swap" && typeof body.params?._request_id === "string") {
       await notifyShiftSwapAccepted(body.params._request_id).catch((error) => console.error("Unable to notify shift requester", error));
     }
@@ -199,7 +224,9 @@ export async function handleDataRequest(request: Request) {
       if (body.table === "invitations" && body.operation === "insert" && row?.email) {
         const url = `${getServerConfig().appUrl}/accept-invite/${row.token}`;
         const organization = await getPool().query("SELECT name FROM organizations WHERE id=$1", [row.organization_id]);
-        const organizationName = organization.rows[0]?.name ?? "an Orbit workspace";
+        const organizationName = organization.rows[0]?.name ?? "a Voltic PMS workspace";
+        const team = row.team_id ? await getPool().query("SELECT name FROM teams WHERE id=$1 AND organization_id=$2", [row.team_id, row.organization_id]) : null;
+        const destinationName = team?.rows[0]?.name ? `${team.rows[0].name} in ${organizationName}` : organizationName;
         const inviter = await getPool().query(`SELECT COALESCE(NULLIF(p.full_name,''),NULLIF(u.name,''),u.email) AS name FROM "user" u LEFT JOIN profiles p ON p.id=u.id WHERE u.id=$1`, [row.invited_by]);
         const inviterName = inviter.rows[0]?.name ?? session.user.name ?? session.user.email;
         const customRole = row.custom_role_id ? await getPool().query("SELECT name FROM custom_roles WHERE id=$1", [row.custom_role_id]) : null;
@@ -207,12 +234,13 @@ export async function handleDataRequest(request: Request) {
         await sendTransactionalEmail({
           kind: "organization-invitation",
           to: row.email,
-          subject: `${inviterName} invited you to ${organizationName}`,
-          text: `${inviterName} invited you to join ${organizationName} as ${roleName}. Review your invitation: ${url}`,
-          html: `<p><strong>${escapeEmailHtml(inviterName)}</strong> invited you to join <strong>${escapeEmailHtml(organizationName)}</strong>.</p><p>Your role will be <strong>${escapeEmailHtml(roleName)}</strong>.</p><p><a href="${url}">Review invitation</a></p>`,
+          subject: `${inviterName} invited you to ${destinationName}`,
+          text: `${inviterName} invited you to join ${destinationName} as ${roleName}. Review your invitation: ${url}`,
+          html: `<p><strong>${escapeEmailHtml(inviterName)}</strong> invited you to join <strong>${escapeEmailHtml(destinationName)}</strong>.</p><p>Your role will be <strong>${escapeEmailHtml(roleName)}</strong>.</p><p><a href="${url}">Review invitation</a></p>`,
         });
       }
-      if (body.table === "tasks" && ["insert", "update"].includes(body.operation) && row?.assignee_id && Object.prototype.hasOwnProperty.call(Array.isArray(body.values) ? body.values[0] : body.values ?? {}, "assignee_id")) {
+      for (const row of result.rows) {
+      if (body.table === "tasks" && ["insert", "update"].includes(body.operation) && row?.assignee_id && (body.operation === "insert" || previousAssignees.get(row.id) !== row.assignee_id)) {
         const context = await getPool().query(
           `SELECT p.key,p.name AS project_name,COALESCE(NULLIF(pr.email,''),u.email) AS email
            FROM projects p
@@ -227,10 +255,10 @@ export async function handleDataRequest(request: Request) {
           const href = `/app/projects/${encodeURIComponent(assignment.key)}?task=${encodeURIComponent(row.id)}`;
           const url = `${getServerConfig().appUrl}${href}`;
           const dedupeVersion = row.updated_at ?? row.created_at ?? new Date().toISOString();
-          await getPool().query(
+          const notice = await getPool().query(
             `INSERT INTO system_notifications(user_id,kind,title,body,href,dedupe_key)
              VALUES($1,'task-assignment',$2,$3,$4,$5)
-             ON CONFLICT(user_id,dedupe_key) DO NOTHING`,
+             ON CONFLICT(user_id,dedupe_key) DO NOTHING RETURNING id`,
             [
               row.assignee_id,
               `Task assigned: ${taskRef}`,
@@ -239,7 +267,7 @@ export async function handleDataRequest(request: Request) {
               `task-assignment:${row.id}:${row.assignee_id}:${dedupeVersion}`,
             ],
           );
-          if (assignment.email) {
+          if (notice.rowCount && assignment.email) {
             await sendTransactionalEmail({
               kind: "task-assignment",
               to: assignment.email,
@@ -249,6 +277,7 @@ export async function handleDataRequest(request: Request) {
             });
           }
         }
+      }
       }
       if (body.table === "tasks" && body.operation === "update" && row?.status === "done" && (Array.isArray(body.values) ? body.values[0] : body.values ?? {}).status === "done") {
         const context = await getPool().query(

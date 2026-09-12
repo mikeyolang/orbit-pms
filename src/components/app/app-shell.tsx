@@ -135,6 +135,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-background">
       <aside className="hidden w-64 flex-col border-r border-white/10 bg-gradient-to-b from-[#1B3673] via-[#142A5C] to-slate-950 text-white shadow-xl md:flex">
+        <Link to="/app" className="flex items-center gap-2.5 border-b border-white/10 px-5 py-4 font-semibold text-white">
+          <span className="grid h-8 w-8 place-items-center rounded-lg bg-white/10 text-sm font-bold">V</span>
+          Voltic PMS
+        </Link>
         <div className="border-b border-white/10 p-3">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
@@ -239,6 +243,9 @@ export function AppShell({ children }: { children: ReactNode }) {
       </aside>
 
       <main className="flex-1 overflow-y-auto">
+        <header className="flex items-center justify-between border-b border-border px-4 py-3 md:hidden">
+          <Link to="/app" className="font-semibold">Voltic PMS</Link>
+        </header>
         <OrgContext.Provider value={{ currentOrg, role, refresh, isSupportOnly, refreshSupport }}>
           {children}
         </OrgContext.Provider>

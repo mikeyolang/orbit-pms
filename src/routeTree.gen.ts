@@ -16,6 +16,8 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ShiftRequestTokenRouteImport } from './routes/shift-request.$token'
+import { Route as ApiTeamInvitationsRouteImport } from './routes/api.team-invitations'
+import { Route as ApiTaskMentionMembersRouteImport } from './routes/api.task-mention-members'
 import { Route as ApiShiftReportRouteImport } from './routes/api.shift-report'
 import { Route as ApiHealthRouteImport } from './routes/api.health'
 import { Route as ApiDataRouteImport } from './routes/api.data'
@@ -23,6 +25,7 @@ import { Route as AcceptInviteTokenRouteImport } from './routes/accept-invite.$t
 import { Route as AuthenticatedOnboardingRouteImport } from './routes/_authenticated/onboarding'
 import { Route as AuthenticatedAppRouteImport } from './routes/_authenticated/app'
 import { Route as AuthenticatedAppIndexRouteImport } from './routes/_authenticated/app.index'
+import { Route as ApiTaskChatStreamRouteImport } from './routes/api.task-chat.stream'
 import { Route as ApiShiftRequestTokenRouteImport } from './routes/api.shift-request.$token'
 import { Route as ApiNotificationsProcessRouteImport } from './routes/api.notifications.process'
 import { Route as ApiMailgunWebhookRouteImport } from './routes/api.mailgun.webhook'
@@ -74,6 +77,16 @@ const ShiftRequestTokenRoute = ShiftRequestTokenRouteImport.update({
   path: '/shift-request/$token',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiTeamInvitationsRoute = ApiTeamInvitationsRouteImport.update({
+  id: '/api/team-invitations',
+  path: '/api/team-invitations',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiTaskMentionMembersRoute = ApiTaskMentionMembersRouteImport.update({
+  id: '/api/task-mention-members',
+  path: '/api/task-mention-members',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiShiftReportRoute = ApiShiftReportRouteImport.update({
   id: '/api/shift-report',
   path: '/api/shift-report',
@@ -108,6 +121,11 @@ const AuthenticatedAppIndexRoute = AuthenticatedAppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AuthenticatedAppRoute,
+} as any)
+const ApiTaskChatStreamRoute = ApiTaskChatStreamRouteImport.update({
+  id: '/api/task-chat/stream',
+  path: '/api/task-chat/stream',
+  getParentRoute: () => rootRouteImport,
 } as any)
 const ApiShiftRequestTokenRoute = ApiShiftRequestTokenRouteImport.update({
   id: '/api/shift-request/$token',
@@ -208,6 +226,8 @@ export interface FileRoutesByFullPath {
   '/api/data': typeof ApiDataRoute
   '/api/health': typeof ApiHealthRoute
   '/api/shift-report': typeof ApiShiftReportRouteWithChildren
+  '/api/task-mention-members': typeof ApiTaskMentionMembersRoute
+  '/api/team-invitations': typeof ApiTeamInvitationsRoute
   '/shift-request/$token': typeof ShiftRequestTokenRoute
   '/app/notifications': typeof AuthenticatedAppNotificationsRoute
   '/app/settings': typeof AuthenticatedAppSettingsRoute
@@ -221,6 +241,7 @@ export interface FileRoutesByFullPath {
   '/api/mailgun/webhook': typeof ApiMailgunWebhookRoute
   '/api/notifications/process': typeof ApiNotificationsProcessRoute
   '/api/shift-request/$token': typeof ApiShiftRequestTokenRoute
+  '/api/task-chat/stream': typeof ApiTaskChatStreamRoute
   '/app/': typeof AuthenticatedAppIndexRoute
   '/app/projects/$key': typeof AuthenticatedAppProjectsKeyRoute
   '/api/shift-report/$id/pdf': typeof ApiShiftReportIdPdfRoute
@@ -238,6 +259,8 @@ export interface FileRoutesByTo {
   '/api/data': typeof ApiDataRoute
   '/api/health': typeof ApiHealthRoute
   '/api/shift-report': typeof ApiShiftReportRouteWithChildren
+  '/api/task-mention-members': typeof ApiTaskMentionMembersRoute
+  '/api/team-invitations': typeof ApiTeamInvitationsRoute
   '/shift-request/$token': typeof ShiftRequestTokenRoute
   '/app/notifications': typeof AuthenticatedAppNotificationsRoute
   '/app/settings': typeof AuthenticatedAppSettingsRoute
@@ -251,6 +274,7 @@ export interface FileRoutesByTo {
   '/api/mailgun/webhook': typeof ApiMailgunWebhookRoute
   '/api/notifications/process': typeof ApiNotificationsProcessRoute
   '/api/shift-request/$token': typeof ApiShiftRequestTokenRoute
+  '/api/task-chat/stream': typeof ApiTaskChatStreamRoute
   '/app': typeof AuthenticatedAppIndexRoute
   '/app/projects/$key': typeof AuthenticatedAppProjectsKeyRoute
   '/api/shift-report/$id/pdf': typeof ApiShiftReportIdPdfRoute
@@ -271,6 +295,8 @@ export interface FileRoutesById {
   '/api/data': typeof ApiDataRoute
   '/api/health': typeof ApiHealthRoute
   '/api/shift-report': typeof ApiShiftReportRouteWithChildren
+  '/api/task-mention-members': typeof ApiTaskMentionMembersRoute
+  '/api/team-invitations': typeof ApiTeamInvitationsRoute
   '/shift-request/$token': typeof ShiftRequestTokenRoute
   '/_authenticated/app/notifications': typeof AuthenticatedAppNotificationsRoute
   '/_authenticated/app/settings': typeof AuthenticatedAppSettingsRoute
@@ -284,6 +310,7 @@ export interface FileRoutesById {
   '/api/mailgun/webhook': typeof ApiMailgunWebhookRoute
   '/api/notifications/process': typeof ApiNotificationsProcessRoute
   '/api/shift-request/$token': typeof ApiShiftRequestTokenRoute
+  '/api/task-chat/stream': typeof ApiTaskChatStreamRoute
   '/_authenticated/app/': typeof AuthenticatedAppIndexRoute
   '/_authenticated/app/projects/$key': typeof AuthenticatedAppProjectsKeyRoute
   '/api/shift-report/$id/pdf': typeof ApiShiftReportIdPdfRoute
@@ -304,6 +331,8 @@ export interface FileRouteTypes {
     | '/api/data'
     | '/api/health'
     | '/api/shift-report'
+    | '/api/task-mention-members'
+    | '/api/team-invitations'
     | '/shift-request/$token'
     | '/app/notifications'
     | '/app/settings'
@@ -317,6 +346,7 @@ export interface FileRouteTypes {
     | '/api/mailgun/webhook'
     | '/api/notifications/process'
     | '/api/shift-request/$token'
+    | '/api/task-chat/stream'
     | '/app/'
     | '/app/projects/$key'
     | '/api/shift-report/$id/pdf'
@@ -334,6 +364,8 @@ export interface FileRouteTypes {
     | '/api/data'
     | '/api/health'
     | '/api/shift-report'
+    | '/api/task-mention-members'
+    | '/api/team-invitations'
     | '/shift-request/$token'
     | '/app/notifications'
     | '/app/settings'
@@ -347,6 +379,7 @@ export interface FileRouteTypes {
     | '/api/mailgun/webhook'
     | '/api/notifications/process'
     | '/api/shift-request/$token'
+    | '/api/task-chat/stream'
     | '/app'
     | '/app/projects/$key'
     | '/api/shift-report/$id/pdf'
@@ -366,6 +399,8 @@ export interface FileRouteTypes {
     | '/api/data'
     | '/api/health'
     | '/api/shift-report'
+    | '/api/task-mention-members'
+    | '/api/team-invitations'
     | '/shift-request/$token'
     | '/_authenticated/app/notifications'
     | '/_authenticated/app/settings'
@@ -379,6 +414,7 @@ export interface FileRouteTypes {
     | '/api/mailgun/webhook'
     | '/api/notifications/process'
     | '/api/shift-request/$token'
+    | '/api/task-chat/stream'
     | '/_authenticated/app/'
     | '/_authenticated/app/projects/$key'
     | '/api/shift-report/$id/pdf'
@@ -397,6 +433,8 @@ export interface RootRouteChildren {
   ApiDataRoute: typeof ApiDataRoute
   ApiHealthRoute: typeof ApiHealthRoute
   ApiShiftReportRoute: typeof ApiShiftReportRouteWithChildren
+  ApiTaskMentionMembersRoute: typeof ApiTaskMentionMembersRoute
+  ApiTeamInvitationsRoute: typeof ApiTeamInvitationsRoute
   ShiftRequestTokenRoute: typeof ShiftRequestTokenRoute
   ApiAuthSplatRoute: typeof ApiAuthSplatRoute
   ApiInvitationTokenRoute: typeof ApiInvitationTokenRoute
@@ -404,6 +442,7 @@ export interface RootRouteChildren {
   ApiMailgunWebhookRoute: typeof ApiMailgunWebhookRoute
   ApiNotificationsProcessRoute: typeof ApiNotificationsProcessRoute
   ApiShiftRequestTokenRoute: typeof ApiShiftRequestTokenRoute
+  ApiTaskChatStreamRoute: typeof ApiTaskChatStreamRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -457,6 +496,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShiftRequestTokenRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/team-invitations': {
+      id: '/api/team-invitations'
+      path: '/api/team-invitations'
+      fullPath: '/api/team-invitations'
+      preLoaderRoute: typeof ApiTeamInvitationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/task-mention-members': {
+      id: '/api/task-mention-members'
+      path: '/api/task-mention-members'
+      fullPath: '/api/task-mention-members'
+      preLoaderRoute: typeof ApiTaskMentionMembersRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/shift-report': {
       id: '/api/shift-report'
       path: '/api/shift-report'
@@ -505,6 +558,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/app/'
       preLoaderRoute: typeof AuthenticatedAppIndexRouteImport
       parentRoute: typeof AuthenticatedAppRoute
+    }
+    '/api/task-chat/stream': {
+      id: '/api/task-chat/stream'
+      path: '/api/task-chat/stream'
+      fullPath: '/api/task-chat/stream'
+      preLoaderRoute: typeof ApiTaskChatStreamRouteImport
+      parentRoute: typeof rootRouteImport
     }
     '/api/shift-request/$token': {
       id: '/api/shift-request/$token'
@@ -686,6 +746,8 @@ const rootRouteChildren: RootRouteChildren = {
   ApiDataRoute: ApiDataRoute,
   ApiHealthRoute: ApiHealthRoute,
   ApiShiftReportRoute: ApiShiftReportRouteWithChildren,
+  ApiTaskMentionMembersRoute: ApiTaskMentionMembersRoute,
+  ApiTeamInvitationsRoute: ApiTeamInvitationsRoute,
   ShiftRequestTokenRoute: ShiftRequestTokenRoute,
   ApiAuthSplatRoute: ApiAuthSplatRoute,
   ApiInvitationTokenRoute: ApiInvitationTokenRoute,
@@ -693,6 +755,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiMailgunWebhookRoute: ApiMailgunWebhookRoute,
   ApiNotificationsProcessRoute: ApiNotificationsProcessRoute,
   ApiShiftRequestTokenRoute: ApiShiftRequestTokenRoute,
+  ApiTaskChatStreamRoute: ApiTaskChatStreamRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

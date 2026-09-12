@@ -40,7 +40,6 @@ function InboxPage() {
 
   const load = useCallback(async () => {
     if (!user) return;
-    setItems(null);
 
     const [{ data: projects }, { data: notices }] = await Promise.all([postgres
       .from("projects")
@@ -119,7 +118,9 @@ function InboxPage() {
   }, [user, currentOrg.organization_id]);
 
   useEffect(() => {
-    load();
+    void load();
+    const timer = window.setInterval(() => { void load(); }, 8000);
+    return () => window.clearInterval(timer);
   }, [load]);
 
   async function markRead(id: string) {
@@ -149,7 +150,7 @@ function InboxPage() {
       </div>
 
       <div className="mt-6 overflow-hidden rounded-xl border border-border bg-card">
-        {systemItems.length > 0 && <ul className="divide-y divide-border border-b border-border">{systemItems.map((notice) => <li key={notice.id} className={`flex gap-3 px-4 py-3 ${notice.read_at ? "bg-card" : "bg-primary/5"}`}><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${notice.read_at ? "bg-muted-foreground/30" : "bg-red-500"}`} /><Bell className={`mt-0.5 h-4 w-4 ${notice.read_at ? "text-muted-foreground" : "text-primary"}`} /><div className="min-w-0 flex-1"><div className={`text-sm ${notice.read_at ? "font-medium" : "font-semibold"}`}>{notice.title}</div><div className="text-xs text-muted-foreground">{notice.body}</div><div className="mt-1 flex items-center gap-3 text-xs"><span className="text-muted-foreground">{formatDistanceToNow(new Date(notice.created_at), { addSuffix: true })}</span>{notice.href && <Link to={notice.href as any} onClick={() => void markRead(notice.id)} className="font-medium text-primary hover:underline">{notice.kind === "task-assignment" || notice.kind === "task-completed" ? "View task" : "Review"}</Link>}{!notice.read_at && <button type="button" onClick={() => void markRead(notice.id)} className="text-muted-foreground hover:text-foreground">Mark read</button>}</div></div></li>)}</ul>}
+        {systemItems.length > 0 && <ul className="divide-y divide-border border-b border-border">{systemItems.map((notice) => <li key={notice.id} className={`flex gap-3 px-4 py-3 ${notice.read_at ? "bg-card" : "bg-primary/5"}`}><span className={`mt-1 h-2 w-2 shrink-0 rounded-full ${notice.read_at ? "bg-muted-foreground/30" : "bg-red-500"}`} /><Bell className={`mt-0.5 h-4 w-4 ${notice.read_at ? "text-muted-foreground" : "text-primary"}`} /><div className="min-w-0 flex-1"><div className={`text-sm ${notice.read_at ? "font-medium" : "font-semibold"}`}>{notice.title}</div><div className="text-xs text-muted-foreground">{notice.body}</div><div className="mt-1 flex items-center gap-3 text-xs"><span className="text-muted-foreground">{formatDistanceToNow(new Date(notice.created_at), { addSuffix: true })}</span>{notice.href && <Link to={notice.href as any} onClick={() => void markRead(notice.id)} className="font-medium text-primary hover:underline">{notice.kind.startsWith("task-") ? "View task" : "Review"}</Link>}{!notice.read_at && <button type="button" onClick={() => void markRead(notice.id)} className="text-muted-foreground hover:text-foreground">Mark read</button>}</div></div></li>)}</ul>}
         {items === null ? (
           <div className="flex justify-center py-16">
             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

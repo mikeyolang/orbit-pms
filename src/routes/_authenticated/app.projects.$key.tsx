@@ -25,13 +25,13 @@ import {
 } from "@/lib/projects";
 
 export const Route = createFileRoute("/_authenticated/app/projects/$key")({
-  validateSearch: z.object({ task: z.string().uuid().optional() }),
+  validateSearch: z.object({ task: z.string().uuid().optional(), tab: z.enum(["details", "chat"]).optional() }),
   component: ProjectDetail,
 });
 
 function ProjectDetail() {
   const { key } = Route.useParams();
-  const { task: linkedTaskId } = Route.useSearch();
+  const { task: linkedTaskId, tab: linkedTab } = Route.useSearch();
   const { currentOrg } = useOrg();
   const navigate = useNavigate();
   const [project, setProject] = useState<Project | null | undefined>(undefined);
@@ -161,6 +161,7 @@ function ProjectDetail() {
       </Tabs>
 
       <TaskDetailSheet
+        initialTab={linkedTab}
         task={activeTask} open={sheetOpen} onOpenChange={setSheetOpen}
         projectKey={project.key} onChanged={load}
       />

@@ -67,7 +67,7 @@ The migration keeps user UUIDs but intentionally does not copy password hashes. 
 4. Set `MAIL_MODE=test` for staging and `MAIL_MODE=send` only after delivery checks pass.
 5. Register `https://YOUR_APP/api/mailgun/webhook` for delivered, failed, bounced, and complained events.
 6. Schedule `POST /api/mail/process` every minute with the bearer cron secret.
-7. Schedule `POST /api/notifications/process` daily with the same bearer cron secret.
+7. Schedule `POST /api/notifications/process` every 15 minutes with the same bearer cron secret.
 
 See [email-notification-testing.md](./email-notification-testing.md) for the complete safe local acceptance flow.
 

@@ -156,6 +156,7 @@ export const invitations = pgTable(
     organizationId: uuid("organization_id")
       .notNull()
       .references(() => organizations.id, { onDelete: "cascade" }),
+    teamId: uuid("team_id"), // Composite team/workspace foreign key is maintained by the SQL migration.
     email: text("email").notNull(),
     role: orgRole("role").default("member").notNull(),
     token: text("token").notNull(),

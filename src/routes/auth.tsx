@@ -173,7 +173,7 @@ function AuthPage() {
       subtitle="Sign in to your workspace"
       footer={
         <>
-          New to Helix?{" "}
+          New to Voltic PMS?{" "}
           <button
             className="text-foreground underline underline-offset-4"
             onClick={() => setMode("signup")}

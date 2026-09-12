@@ -160,7 +160,7 @@ function SettingsPage() {
           <div className="space-y-1.5">
             <Label className="text-xs text-muted-foreground">URL slug</Label>
             <div className="flex items-center rounded-md border border-input bg-input/40 px-3 text-sm text-muted-foreground">
-              <span className="select-none">helix.app/</span>
+              <span className="select-none">Workspace /</span>
               <input
                 value={wsSlug}
                 onChange={(e) => setWsSlug(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}

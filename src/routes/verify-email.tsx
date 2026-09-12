@@ -42,7 +42,7 @@ function VerifyEmail() {
         <MailCheck className="mx-auto h-10 w-10 text-primary" />
         <p className="text-sm text-muted-foreground">
           Open the link in the message to verify your address. The link will return you securely to
-          Orbit.
+          Voltic PMS.
         </p>
         <Button
           type="button"

@@ -62,7 +62,7 @@ Run `crontab -e` on the server and add the following lines, replacing `YOUR_CRON
 
 ```cron
 * * * * * curl -fsS -X POST -H "Authorization: Bearer YOUR_CRON_SECRET" http://127.0.0.1:8080/api/mail/process >/dev/null 2>&1
-15 1 * * * curl -fsS -X POST -H "Authorization: Bearer YOUR_CRON_SECRET" http://127.0.0.1:8080/api/notifications/process >/dev/null 2>&1
+*/15 * * * * curl -fsS -X POST -H "Authorization: Bearer YOUR_CRON_SECRET" http://127.0.0.1:8080/api/notifications/process >/dev/null 2>&1
 ```
 
 ## Future deployments
@@ -79,3 +79,5 @@ The migration container runs again and applies only pending migrations. PostgreS
 ## Important limitation
 
 This temporary deployment uses unencrypted HTTP. Do not treat it as a secure public production system. Add a domain and HTTPS before users enter sensitive data.
+
+The Compose stack now includes `notification-worker` for deadline checks and email delivery. The manual cron entries above are only an alternative; do not run them alongside the worker.

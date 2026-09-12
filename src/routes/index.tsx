@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { ArrowRight, BarChart3, BellRing, CalendarClock, FileText, KanbanSquare, ShieldCheck, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { authClient } from "@/lib/auth-client";
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Helix — Projects, Shifts and Team Operations" },
+      { title: "Voltic PMS — Projects, Shifts and Team Operations" },
       {
         name: "description",
         content:
@@ -19,7 +19,6 @@ export const Route = createFileRoute("/")({
 });
 
 function Landing() {
-  const navigate = useNavigate();
   const [signedIn, setSignedIn] = useState(false);
 
   useEffect(() => {
@@ -28,21 +27,20 @@ function Landing() {
       if (!active) return;
       if (data?.session) {
         setSignedIn(true);
-        navigate({ to: "/onboarding", replace: true });
       }
     });
     return () => {
       active = false;
     };
-  }, [navigate]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-background text-foreground">
       <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <Link to="/" className="flex items-center gap-2.5 font-bold tracking-tight">
-            <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#1B3673] text-xs text-white shadow-md">H</div>
-            <span className="text-lg">Helix</span>
+            <div className="grid h-8 w-8 place-items-center rounded-lg bg-[#1B3673] text-xs text-white shadow-md">V</div>
+            <span className="text-lg">Voltic PMS</span>
           </Link>
           <div className="flex items-center gap-2">
             {signedIn ? (

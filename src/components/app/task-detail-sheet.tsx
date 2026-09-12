@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Trash2, Link2, Plus, X } from "lucide-react";
@@ -20,8 +21,9 @@ import { useOrg } from "./app-shell";
 interface Member { user_id: string; full_name: string | null; email: string | null }
 
 export function TaskDetailSheet({
-  task, open, onOpenChange, onChanged, projectKey,
+  task, open, onOpenChange, onChanged, projectKey, initialTab = "details",
 }: {
+  initialTab?: "details" | "chat";
   task: Task | null;
   open: boolean;
   onOpenChange: (v: boolean) => void;
@@ -153,7 +155,15 @@ export function TaskDetailSheet({
           </SheetTitle>
         </SheetHeader>
 
-        <div className="mt-4 space-y-5">
+        <Tabs key={`${t.id}:${initialTab}`} defaultValue={initialTab} className="mt-4">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="details">Details</TabsTrigger>
+            <TabsTrigger value="chat">Chat & activity</TabsTrigger>
+          </TabsList>
+          <TabsContent value="chat" className="mt-4">
+            <TaskCommentsActivity key={t.id} taskId={t.id} />
+          </TabsContent>
+          <TabsContent value="details" className="mt-4 space-y-5">
           <div className="grid grid-cols-2 gap-3">
             <Sel label="Status" value={t.status} onChange={(v) => patch({ status: v as never })}
               options={TASK_STATUSES.map((s) => ({ value: s.value, label: s.label }))} />
@@ -260,15 +270,12 @@ export function TaskDetailSheet({
           </div>
 
           <div className="border-t border-border/60 pt-4">
-            <TaskCommentsActivity taskId={t.id} />
-          </div>
-
-          <div className="border-t border-border/60 pt-4">
             <Button variant="ghost" size="sm" className="text-destructive hover:text-destructive" onClick={deleteTask}>
               <Trash2 className="h-4 w-4" />Delete task
             </Button>
           </div>
-        </div>
+          </TabsContent>
+        </Tabs>
       </SheetContent>
     </Sheet>
   );

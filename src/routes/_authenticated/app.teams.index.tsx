@@ -4,6 +4,7 @@ import { z } from "zod";
 import { postgres } from "@/integrations/postgres/client";
 import { useOrg } from "@/components/app/app-shell";
 import { useAuthSession } from "@/lib/auth";
+import { useMyPermissions } from "@/lib/permissions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -416,14 +417,22 @@ function ManageMembers({
   onChanged: () => void;
 }) {
   const [pick, setPick] = useState("none");
-  const available = members.filter((m) => !memberIds.includes(m.user_id));
+  const [search, setSearch] = useState("");
+  const [adding, setAdding] = useState(false);
+  const { can } = useMyPermissions(team.organization_id);
+  const available = members.filter((m) => !memberIds.includes(m.user_id) &&
+    `${m.full_name ?? ""} ${m.email ?? ""}`.toLowerCase().includes(search.toLowerCase()));
 
   async function add() {
-    if (pick === "none") return;
-    const { error } = await postgres.from("team_members").insert({ team_id: team.id, user_id: pick, role: "member" });
-    if (error) return toast.error(error.message);
-    setPick("none");
-    onChanged();
+    if (pick === "none" || adding) return;
+    setAdding(true);
+    try {
+      await updateTeamInvitation({ action: "add", teamId: team.id, userId: pick });
+      setPick("none");
+      toast.success("Member added to team");
+      onChanged();
+    } catch (error) { toast.error(error instanceof Error ? error.message : "Unable to add member"); }
+    finally { setAdding(false); }
   }
 
   async function remove(userId: string) {
@@ -434,6 +443,8 @@ function ManageMembers({
 
   return (
     <div className="space-y-2">
+      {can("members.invite") && <TeamInvitationDialog team={team} onChanged={onChanged} />}
+      <Input aria-label={`Search workspace members for ${team.name}`} placeholder="Search workspace members…" value={search} onChange={(event) => { setSearch(event.target.value); setPick("none"); }} className="h-8 text-xs" />
       <div className="flex items-center gap-2">
         <Select value={pick} onValueChange={setPick}>
           <SelectTrigger className="h-8 flex-1 text-xs">
@@ -448,7 +459,7 @@ function ManageMembers({
             ))}
           </SelectContent>
         </Select>
-        <Button size="sm" variant="outline" onClick={add} disabled={pick === "none"}>
+        <Button size="sm" variant="outline" onClick={add} disabled={pick === "none" || adding}>
           <UserPlus className="h-3.5 w-3.5" /> Add
         </Button>
       </div>
@@ -473,6 +484,78 @@ function ManageMembers({
       )}
     </div>
   );
+}
+
+type PendingTeamInvitation = { id: string; email: string; expires_at: string };
+
+async function updateTeamInvitation(values: Record<string, string>) {
+  const response = await fetch("/api/team-invitations", {
+    method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(values),
+  });
+  const result = await response.json();
+  if (!response.ok) throw new Error(result.error ?? "Unable to update invitation");
+  return result as { outcome: string; warning?: string };
+}
+
+function TeamInvitationDialog({ team, onChanged }: { team: Team; onChanged: () => void }) {
+  const [open, setOpen] = useState(false);
+  const [email, setEmail] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [pending, setPending] = useState<PendingTeamInvitation[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const load = useCallback(async () => {
+    setLoading(true);
+    setError("");
+    try {
+      const response = await fetch(`/api/team-invitations?teamId=${encodeURIComponent(team.id)}`);
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Unable to load invitations");
+      setPending(result.invitations);
+    } catch (error) { setError(error instanceof Error ? error.message : "Unable to load invitations"); }
+    finally { setLoading(false); }
+  }, [team.id]);
+  useEffect(() => { if (open) void load(); }, [open, load]);
+
+  async function act(action: "invite" | "resend" | "cancel", invitationId?: string) {
+    if (busy) return;
+    setBusy(true);
+    setError("");
+    try {
+      const result = await updateTeamInvitation({ action, teamId: team.id,
+        ...(action === "invite" ? { email: email.trim() } : { invitationId: invitationId! }) });
+      if (result.warning) toast.warning(result.warning);
+      else toast.success(result.outcome === "added" ? "Member added to team" : result.outcome === "cancelled" ? "Invitation cancelled" : "Invitation email queued");
+      if (action === "invite") setEmail("");
+      onChanged();
+      await load();
+    } catch (error) { setError(error instanceof Error ? error.message : "Unable to update invitation"); }
+    finally { setBusy(false); }
+  }
+
+  return <Dialog open={open} onOpenChange={setOpen}>
+    <DialogTrigger asChild><Button size="sm" variant="outline" className="w-full"><UserPlus className="h-3.5 w-3.5" /> Invite member</Button></DialogTrigger>
+    <DialogContent className="max-h-[85vh] overflow-y-auto">
+      <DialogHeader><DialogTitle>Invite to {team.name}</DialogTitle></DialogHeader>
+      <p className="text-sm text-muted-foreground">Existing workspace members are added immediately. New members receive an email to join the workspace and this team. Invitations expire after seven days.</p>
+      <form onSubmit={(event) => { event.preventDefault(); void act("invite"); }} className="space-y-3">
+        <Label htmlFor={`invite-email-${team.id}`}>Email address</Label>
+        <Input id={`invite-email-${team.id}`} type="email" autoComplete="email" maxLength={254} required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" disabled={busy} />
+        <Button type="submit" disabled={busy || !email.trim()}>{busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <UserPlus className="h-4 w-4" />} Invite member</Button>
+      </form>
+      {error && <p role="alert" className="text-sm text-destructive">{error}</p>}
+      <div className="space-y-3 border-t pt-4">
+        <div className="flex items-center justify-between"><h3 className="text-sm font-medium">Pending invitations</h3><Button size="sm" variant="ghost" disabled={busy || loading} onClick={() => void load()}>Refresh</Button></div>
+        {loading ? <p className="text-sm text-muted-foreground">Loading invitations…</p> : pending.length === 0 ? <p className="text-sm text-muted-foreground">No pending invitations.</p> : <ul className="space-y-3">{pending.map((invitation) => {
+          const expired = new Date(invitation.expires_at).getTime() <= Date.now();
+          return <li key={invitation.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+            <div className="min-w-0"><p className="break-all text-sm font-medium">{invitation.email}</p><p className="text-xs text-muted-foreground">{expired ? "Expired" : `Expires ${new Date(invitation.expires_at).toLocaleDateString()}`}</p></div>
+            <div className="flex gap-2"><Button size="sm" variant="outline" disabled={busy} onClick={() => void act("resend", invitation.id)}>Resend</Button><Button size="sm" variant="ghost" disabled={busy} onClick={() => void act("cancel", invitation.id)}>Cancel</Button></div>
+          </li>;
+        })}</ul>}
+      </div>
+    </DialogContent>
+  </Dialog>;
 }
 
 function NewTeamDialog({ orgId, onCreated }: { orgId: string; onCreated: () => void }) {

@@ -25,6 +25,7 @@ import {
   Flame,
   FolderKanban,
   Gauge,
+  Home,
   ListChecks,
   Radio,
   Play,
@@ -185,6 +186,10 @@ function useWidgetPrefs(orgId: string, userId: string | null) {
   return { hidden, toggle, reset, show: (id: WidgetId) => !hidden.has(id) };
 }
 
+function DashboardHomeLink() {
+  return <Button asChild size="sm" variant="outline"><Link to="/"><Home className="h-4 w-4" /> Home</Link></Button>;
+}
+
 function Dashboard() {
   const { currentOrg } = useOrg();
   const shiftOnly = currentOrg.can_access_shifts !== false && currentOrg.can_access_projects === false;
@@ -234,6 +239,7 @@ function ShiftOnlyDashboard() {
   }
 
   return <div className="mx-auto max-w-6xl space-y-6 px-6 py-8 lg:px-8">
+    <div className="flex justify-end"><DashboardHomeLink /></div>
     <div><div className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarClock className="h-3.5 w-3.5" />Your shift dashboard · {formatDate(new Date().toISOString())}</div><h1 className="mt-2 text-3xl font-semibold tracking-tight">Welcome to {currentOrg.organization.name}</h1><p className="mt-1 text-sm text-muted-foreground">A quick summary of your recently completed shifts.</p></div>
     {reports === null || upcoming === null ? <DashboardLoading /> : <>
       <section className="rounded-xl border border-cyan-500/20 bg-gradient-to-br from-cyan-500/10 via-card to-card p-4 shadow-sm"><div className="flex items-center justify-between"><div><h2 className="font-semibold">Upcoming shifts</h2><p className="text-xs text-muted-foreground">Your next scheduled shifts.</p></div><Button asChild size="sm" variant="outline"><Link to="/app/shifts">Open calendar</Link></Button></div>{upcoming.length ? <div className="mt-3 grid gap-3 sm:grid-cols-2">{upcoming.map((shift) => { const ready = shift.status === "scheduled" && new Date(shift.start_at).getTime() <= Date.now() && new Date(shift.end_at).getTime() >= Date.now(); const active = shift.status === "in_progress"; return <div key={shift.id} className={`rounded-xl border p-4 shadow-sm ${active ? "border-emerald-500/40 bg-emerald-500/10" : "border-cyan-500/20 bg-background/65"}`}><div className="flex items-start gap-3"><span className="mt-1 h-3 w-3 rounded-full" style={{ backgroundColor: shift.shift_type?.color ?? "#06b6d4" }} /><div className="min-w-0 flex-1"><div className="font-medium">{shift.shift_type?.label ?? "Shift"}</div><div className="mt-1 text-sm text-muted-foreground">{new Date(shift.start_at).toLocaleString(undefined, { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}</div><div className="text-xs text-muted-foreground">Until {new Date(shift.end_at).toLocaleString(undefined, { hour: "numeric", minute: "2-digit" })}</div>{ready && <Button size="sm" className="mt-3 bg-emerald-600 text-white hover:bg-emerald-700" onClick={() => void startShift(shift.id)}><Play className="h-4 w-4" />Start shift</Button>}{active && <Button size="sm" className="mt-3 bg-red-600 text-white hover:bg-red-700" onClick={() => setEndTarget(shift.id)}><StopCircle className="h-4 w-4" />End shift</Button>}</div></div></div>; })}</div> : <div className="mt-3 rounded-xl border border-dashed border-cyan-500/25 bg-background/40 p-8 text-center"><CalendarClock className="mx-auto h-6 w-6 text-cyan-600" /><p className="mt-2 text-sm font-medium">No upcoming shifts yet</p><p className="text-xs text-muted-foreground">New assignments will appear here automatically.</p></div>}</section>
@@ -384,7 +390,8 @@ function ProjectDashboard() {
               : "Manager-ready visibility across delivery progress, sprint health, workload, risk, and accountability."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <DashboardHomeLink />
           <span
             className={cn(
               "inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[10px]",
